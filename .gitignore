@@ -1,0 +1,11 @@
+# .NET compilation folders
+[Bb]in/
+[Oo]bj/
+
+# Personal application settings
+regions.json
+
+# Generated EPG files
+*.xml
+*.gz
+*.xml.gz
