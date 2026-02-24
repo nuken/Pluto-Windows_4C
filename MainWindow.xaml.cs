@@ -162,42 +162,42 @@ namespace PlutoForChannels
         }
 
         private void CopyLink_Click(object sender, RoutedEventArgs e)
-{
-    if (sender is System.Windows.Controls.Button btn && btn.Tag is string url)
-    {
-        bool success = false;
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string url)
+            {
+                bool success = false;
 
-        // Attempt to copy up to 5 times to bypass temporary COM locks
-        for (int i = 0; i < 5; i++)
-        {
-            try
-            {
-                System.Windows.Clipboard.SetText(url);
-                success = true;
-                break; // Break out of the loop if successful
-            }
-            catch (System.Runtime.InteropServices.COMException)
-            {
-                // Wait 50 milliseconds before trying again
-                System.Threading.Thread.Sleep(50);
-            }
-            catch (Exception ex)
-            {
-                App.LogToConsole($"[ERROR] Clipboard error: {ex.Message}");
-                break;
-            }
-        }
+                // Attempt to copy up to 5 times to bypass temporary COM locks
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        System.Windows.Clipboard.SetText(url);
+                        success = true;
+                        break; // Break out of the loop if successful
+                    }
+                    catch (System.Runtime.InteropServices.COMException)
+                    {
+                        // Wait 50 milliseconds before trying again
+                        System.Threading.Thread.Sleep(50);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.LogToConsole($"[ERROR] Clipboard error: {ex.Message}");
+                        break;
+                    }
+                }
 
-        if (success)
-        {
-            System.Windows.MessageBox.Show("URL copied!", "Copied", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                if (success)
+                {
+                    System.Windows.MessageBox.Show("URL copied!", "Copied", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show("Could not access the clipboard. Another application might be locking it.", "Clipboard Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                }
+            }
         }
-        else
-        {
-            System.Windows.MessageBox.Show("Could not access the clipboard. Another application might be locking it.", "Clipboard Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-        }
-    }
-}
     }
 
     public class RegionOption { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
