@@ -167,7 +167,7 @@ namespace PlutoForChannels
                 AppWindow.StatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 0));
                 
                 // Refresh the new dynamic links
-                AppWindow.RefreshLinks($"localhost:{_currentPort}");
+                AppWindow.RefreshLinks($"{GetLocalIPAddress()}:{_currentPort}");
             }
         }
 
@@ -175,7 +175,7 @@ namespace PlutoForChannels
         {
             if (AppWindow != null)
             {
-                AppWindow.RefreshLinks($"localhost:{_currentPort}");
+                AppWindow.RefreshLinks($"{GetLocalIPAddress()}:{_currentPort}");
                 var selected = AppWindow.Regions.Where(r => r.IsSelected).Select(r => r.Name);
                 LogToConsole($"Active regions updated: {string.Join(", ", selected)}");
             }
@@ -211,5 +211,18 @@ namespace PlutoForChannels
                 });
             }
         }
+
+        private static string GetLocalIPAddress()
+{
+    var host = Dns.GetHostEntry(Dns.GetHostName());
+    foreach (var ip in host.AddressList)
+    {
+        if (ip.AddressFamily == AddressFamily.InterNetwork)
+        {
+            return ip.ToString();
+        }
+    }
+    return "127.0.0.1"; // Fallback just in case
+}
     }
 }
