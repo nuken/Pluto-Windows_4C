@@ -214,15 +214,41 @@ namespace PlutoForChannels
 
         private static string GetLocalIPAddress()
 {
-    var host = Dns.GetHostEntry(Dns.GetHostName());
-    foreach (var ip in host.AddressList)
+    // Try to find the primary routing IP by simulating a connection to an external address.
+    // (This does not actually send data over the internet, it just checks the local routing table).
+    try
     {
-        if (ip.AddressFamily == AddressFamily.InterNetwork)
+        using (var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
         {
-            return ip.ToString();
+            socket.Connect("8.8.8.8", 65530);
+            var endPoint = socket.LocalEndPoint as System.Net.IPEndPoint;
+            if (endPoint != null)
+            {
+                return endPoint.Address.ToString();
+            }
         }
     }
-    return "127.0.0.1"; // Fallback just in case
+    catch
+    {
+        // Ignore errors and fall back to the secondary method
+    }
+
+    // Fallback: manually search the adapters, heavily preferring standard home network ranges
+    var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+    foreach (var ip in host.AddressList)
+    {
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            string ipStr = ip.ToString();
+            // Look for standard 192.168.x.x, 10.x.x.x, or 172.16.x.x ranges
+            if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || ipStr.StartsWith("172."))
+            {
+                return ipStr;
+            }
+        }
+    }
+
+    return "127.0.0.1";
 }
     }
 }
