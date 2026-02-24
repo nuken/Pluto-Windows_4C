@@ -10,7 +10,7 @@ namespace PlutoForChannels
     {
         public ObservableCollection<RegionOption> Regions { get; set; } = new();
         public ObservableCollection<FeedLink> VisibleLinks { get; set; } = new();
-        
+
         // The system tray icon
         private System.Windows.Forms.NotifyIcon? _notifyIcon;
         private bool _isActualExit = false;
@@ -21,7 +21,7 @@ namespace PlutoForChannels
             InitializeRegions();
             CountryList.ItemsSource = Regions;
             LinksContainer.ItemsSource = VisibleLinks;
-            
+
             SetupSystemTrayIcon();
         }
 
@@ -29,10 +29,10 @@ namespace PlutoForChannels
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
             // We use a default Windows icon here, so we don't need to load external image files
-            _notifyIcon.Icon = System.Drawing.SystemIcons.Information; 
+            _notifyIcon.Icon = System.Drawing.SystemIcons.Information;
             _notifyIcon.Text = "Pluto for Channels .NET";
             _notifyIcon.Visible = true;
-            
+
             // Double-click the tray icon to bring the window back
             _notifyIcon.DoubleClick += (s, e) =>
             {
@@ -43,7 +43,7 @@ namespace PlutoForChannels
 
             // Right-click context menu
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
-            
+
             var showMenuItem = new System.Windows.Forms.ToolStripMenuItem("Show Dashboard");
             showMenuItem.Click += (s, e) =>
             {
@@ -64,7 +64,7 @@ namespace PlutoForChannels
             contextMenu.Items.Add(showMenuItem);
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             contextMenu.Items.Add(quitMenuItem);
-            
+
             _notifyIcon.ContextMenuStrip = contextMenu;
         }
 
@@ -75,7 +75,7 @@ namespace PlutoForChannels
             {
                 e.Cancel = true; // Stop the window from closing
                 this.Hide();     // Hide it from the taskbar
-                
+
                 // Show a little Windows notification balloon
                 _notifyIcon?.ShowBalloonTip(2000, "Pluto for Channels", "Server is still running in the background.", System.Windows.Forms.ToolTipIcon.Info);
             }
@@ -89,15 +89,15 @@ namespace PlutoForChannels
         {
             string[] codes = { "all", "local", "us_east", "us_west", "ca", "uk", "fr", "de" };
             var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "regions.json");
-            
+
             System.Collections.Generic.List<string>? savedRegions = null;
-            
+
             if (System.IO.File.Exists(settingsPath))
             {
                 try
                 {
                     var json = System.IO.File.ReadAllText(settingsPath);
-                    savedRegions = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(json);{
+                    savedRegions = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(json);
                 }
                 catch { /* If JSON is corrupted, it will just fall back to defaults */ }
             }
@@ -114,18 +114,18 @@ namespace PlutoForChannels
                     // Default fallback if no settings file exists yet
                     isSelected = (code == "all" || code == "local");
                 }
-                
+
                 Regions.Add(new RegionOption { Name = code, IsSelected = isSelected });
             }
         }
-		
+
 		private void SaveSettings()
         {
             try
             {
                 var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "regions.json");
                 var selected = new System.Collections.Generic.List<string>();
-                
+
                 foreach (var r in Regions)
                 {
                     if (r.IsSelected) selected.Add(r.Name);
