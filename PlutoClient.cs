@@ -15,9 +15,7 @@ namespace PlutoForChannels
         private readonly HttpClient _httpClient;
         private readonly Guid _device;
 		public string DeviceId => _device.ToString();
-        private readonly string? _username;
-        private readonly string? _password;
-
+        
         // Thread-safe caching for the session tokens (valid for 4 hours)
         private readonly ConcurrentDictionary<string, JsonNode> _responseList = new();
         private readonly ConcurrentDictionary<string, DateTime> _sessionAt = new();
@@ -37,11 +35,32 @@ namespace PlutoForChannels
         public PlutoClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _device = Guid.NewGuid(); // Generates a unique UUID on boot
+            _device = Guid.NewGuid(); // Generates a unique UUID on boot            
             
-            // Read credentials just like the Python os.environ.get
-            _username = Environment.GetEnvironmentVariable("PLUTO_USERNAME");
-            _password = Environment.GetEnvironmentVariable("PLUTO_PASSWORD");
+        }
+		public void ClearCache()
+        {
+            _responseList.Clear();
+            _sessionAt.Clear();
+        }
+
+        private (string username, string password) GetCredentials()
+        {
+            var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+            if (System.IO.File.Exists(settingsPath))
+            {
+                try
+                {
+                    var json = System.IO.File.ReadAllText(settingsPath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+                    string u = root.TryGetProperty("Username", out var ue) ? ue.GetString() ?? "" : "";
+                    string p = root.TryGetProperty("Password", out var pe) ? pe.GetString() ?? "" : "";
+                    return (u, p);
+                }
+                catch { }
+            }
+            return ("", "");
         }
 
         /// <summary>
@@ -72,10 +91,11 @@ namespace PlutoForChannels
             query["serverSideAds"] = "false";
             query["drmCapabilities"] = "widevine:L3";
 
-            if (!string.IsNullOrEmpty(_username) && !string.IsNullOrEmpty(_password))
+            var (username, password) = GetCredentials();
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
-                query["username"] = _username;
-                query["password"] = _password;
+                query["username"] = username;
+                query["password"] = password;
             }
 
             var requestUri = $"https://boot.pluto.tv/v4/start?{query}";

@@ -10,7 +10,7 @@
 
         <StackPanel Grid.Column="0" Margin="0,0,20,0">
             <TextBlock Text="Active Regions" Foreground="White" FontSize="18" Margin="0,0,0,10"/>
-            <ListBox x:Name="CountryList" Background="#252525" Foreground="White" BorderThickness="0">
+            <ListBox x:Name="CountryList" Background="#252525" Foreground="White" BorderThickness="0" Margin="0,0,0,20">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" 
@@ -18,6 +18,17 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <TextBlock Text="Authentication" Foreground="White" FontSize="18" Margin="0,0,0,10"/>
+            
+            <TextBlock Text="Username / Email" Foreground="LightGray" Margin="0,0,0,2"/>
+            <TextBox x:Name="UsernameBox" Margin="0,0,0,10" Background="#252525" Foreground="White" Padding="5"/>
+            
+            <TextBlock Text="Password" Foreground="LightGray" Margin="0,0,0,2"/>
+            <PasswordBox x:Name="PasswordBox" Margin="0,0,0,10" Background="#252525" Foreground="White" Padding="5"/>
+            
+            <Button Content="Save Login" Background="#3273DC" Foreground="White" FontWeight="Bold" 
+                    Padding="8" BorderThickness="0" Cursor="Hand" Click="SaveLogin_Click"/>
         </StackPanel>
 
         <StackPanel Grid.Column="1">

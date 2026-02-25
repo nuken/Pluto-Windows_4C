@@ -17,6 +17,7 @@ namespace PlutoForChannels
 {
     public partial class App : System.Windows.Application
     {
+		public static PlutoClient? GlobalPlutoClient { get; private set; }
         private WebApplication? _host;
         public static MainWindow? AppWindow { get; private set; }
         private static int _currentPort = 7777; // Store port for global access
@@ -49,6 +50,7 @@ namespace PlutoForChannels
             builder.Services.AddHostedService<EpgService>();
 
             _host = builder.Build();
+			GlobalPlutoClient = _host.Services.GetRequiredService<PlutoClient>();
 
             // 1. Dashboard / Index Route
             _host.MapGet("/", (HttpContext context) => 
@@ -109,41 +111,28 @@ namespace PlutoForChannels
                 var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
                 var basePath = $"/stitch/hls/channel/{id}/master.m3u8";
 
-                // Channels known to explicitly require the v2 endpoint
-                string[] jwtRequiredList = { "625f054c5dfea70007244612", "625f04253e5f6c000708f3b7", "5421f71da6af422839419cb3" };
-
-                // 1. Use Pluto's provided parameters, or fallback to manual generation if they are missing
                 string finalQuery = stitcherParams;
                 if (string.IsNullOrEmpty(finalQuery))
                 {
                     finalQuery = $"advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId={plutoClient.DeviceId}&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid={Guid.NewGuid()}&userId=&serverSideAds=true";
                 }
 
-                // 2. Modern Pluto TV requires the session token appended to the query safely
+                // Modern Pluto TV requires the session token on EVERY channel
                 if (!finalQuery.Contains("jwt=") && !string.IsNullOrEmpty(token))
                 {
                     finalQuery += $"&jwt={token}";
                 }
 
-                string videoUrl;
+                if (!finalQuery.Contains("masterJWTPassthrough"))
+                    finalQuery += "&masterJWTPassthrough=true";
 
-                // 3. Route to the correct endpoint
-                if (jwtRequiredList.Contains(id))
-                {
-                    if (!finalQuery.Contains("masterJWTPassthrough"))
-                        finalQuery += "&masterJWTPassthrough=true";
-
-                    if (!finalQuery.Contains("includeExtendedEvents"))
-                        finalQuery += "&includeExtendedEvents=true";
-                    else
-                        finalQuery = finalQuery.Replace("includeExtendedEvents=false", "includeExtendedEvents=true");
-
-                    videoUrl = $"{stitcher}/v2{basePath}?{finalQuery}";
-                }
+                if (!finalQuery.Contains("includeExtendedEvents"))
+                    finalQuery += "&includeExtendedEvents=true";
                 else
-                {
-                    videoUrl = $"{stitcher}{basePath}?{finalQuery}";
-                }
+                    finalQuery = finalQuery.Replace("includeExtendedEvents=false", "includeExtendedEvents=true");
+
+                // Route all traffic through the v2 endpoint
+                string videoUrl = $"{stitcher}/v2{basePath}?{finalQuery}";
 
                 LogToConsole($"[WATCH] Stream requested for channel: {id}");
                 return Results.Redirect(videoUrl, permanent: false);

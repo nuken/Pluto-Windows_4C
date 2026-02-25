@@ -88,56 +88,62 @@ namespace PlutoForChannels
         private void InitializeRegions()
         {
             string[] codes = { "all", "local", "us_east", "us_west", "ca", "uk", "fr", "de" };
-            var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "regions.json");
+            var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
 
-            System.Collections.Generic.List<string>? savedRegions = null;
+            AppSettings? settings = null;
 
             if (System.IO.File.Exists(settingsPath))
             {
                 try
                 {
                     var json = System.IO.File.ReadAllText(settingsPath);
-                    savedRegions = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(json);
+                    settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+                    
+                    // Populate UI with saved credentials
+                    UsernameBox.Text = settings?.Username ?? "";
+                    PasswordBox.Password = settings?.Password ?? "";
                 }
-                catch { /* If JSON is corrupted, it will just fall back to defaults */ }
+                catch { /* Fallback to default if corrupted */ }
             }
 
             foreach (var code in codes)
             {
-                bool isSelected = false;
-                if (savedRegions != null)
-                {
-                    isSelected = savedRegions.Contains(code);
-                }
-                else
-                {
-                    // Default fallback if no settings file exists yet
-                    isSelected = (code == "all" || code == "local");
-                }
-
+                bool isSelected = settings?.SelectedRegions?.Contains(code) ?? (code == "all" || code == "local");
                 Regions.Add(new RegionOption { Name = code, IsSelected = isSelected });
             }
         }
 
-		private void SaveSettings()
+        private void SaveSettings()
         {
             try
             {
-                var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "regions.json");
-                var selected = new System.Collections.Generic.List<string>();
+                var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+                var settings = new AppSettings
+                {
+                    Username = UsernameBox.Text.Trim(),
+                    Password = PasswordBox.Password
+                };
 
                 foreach (var r in Regions)
                 {
-                    if (r.IsSelected) selected.Add(r.Name);
+                    if (r.IsSelected) settings.SelectedRegions.Add(r.Name);
                 }
 
-                var json = System.Text.Json.JsonSerializer.Serialize(selected);
+                var json = System.Text.Json.JsonSerializer.Serialize(settings);
                 System.IO.File.WriteAllText(settingsPath, json);
             }
             catch (Exception ex)
             {
-                App.LogToConsole($"[WARNING] Could not save regions.json: {ex.Message}");
+                App.LogToConsole($"[WARNING] Could not save settings.json: {ex.Message}");
             }
+        }
+
+        private void SaveLogin_Click(object sender, RoutedEventArgs e)
+        {
+            SaveSettings();
+            App.GlobalPlutoClient?.ClearCache(); // Force the app to get a new session token
+            App.LogToConsole("[INFO] Credentials saved. Session cache cleared.");
+            System.Windows.MessageBox.Show("Credentials saved successfully!", "Saved", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
 
         public void RefreshLinks(string host)
@@ -202,4 +208,11 @@ namespace PlutoForChannels
 
     public class RegionOption { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
     public class FeedLink { public string Title { get; set; } = ""; public string Url { get; set; } = ""; }
+	
+	public class AppSettings
+    {
+        public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
 }
