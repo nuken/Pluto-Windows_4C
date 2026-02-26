@@ -16,7 +16,17 @@ namespace PlutoForChannels
         private readonly PlutoClient _plutoClient;
         private readonly string[] _supportedCountries = { "local", "us_east", "us_west", "ca", "uk", "fr", "de" };
 
-        public EpgService(PlutoClient plutoClient)
+        private static CancellationTokenSource _delayTokenSource = new CancellationTokenSource();
+
+        public static void ForceRun()
+        {
+            if (!_delayTokenSource.IsCancellationRequested)
+            {
+                _delayTokenSource.Cancel();
+            }
+        }
+		
+		public EpgService(PlutoClient plutoClient)
         {
             _plutoClient = plutoClient;
         }
@@ -56,7 +66,23 @@ namespace PlutoForChannels
                     App.LogToConsole($"[ERROR] EPG Scheduler: {ex.Message}");
                 }
 
-                await Task.Delay(TimeSpan.FromHours(2), stoppingToken);
+                // Wait for 2 hours OR until ForceRun() is called
+                try
+                {
+                    using var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, _delayTokenSource.Token);
+                    await Task.Delay(TimeSpan.FromHours(2), linkedToken.Token);
+                }
+                catch (TaskCanceledException)
+                {
+                    // The delay was interrupted by ForceRun!
+                }
+                
+                // Reset the wake-up token for the next nap
+                if (_delayTokenSource.IsCancellationRequested)
+                {
+                    _delayTokenSource.Dispose();
+                    _delayTokenSource = new CancellationTokenSource();
+                }
             }
         }
 

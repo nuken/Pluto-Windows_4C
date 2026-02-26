@@ -5,6 +5,8 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+	
+	<ApplicationIcon>icon.ico</ApplicationIcon>
     
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms> 

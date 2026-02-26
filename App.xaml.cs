@@ -106,38 +106,29 @@ namespace PlutoForChannels
 
                 var token = bootData["sessionToken"]?.ToString() ?? "";
                 var stitcherParams = bootData["stitcherParams"]?.ToString() ?? "";
-                stitcherParams = stitcherParams.TrimStart('?', '&');
                 
                 var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
                 var basePath = $"/stitch/hls/channel/{id}/master.m3u8";
 
-                string finalQuery = stitcherParams;
-                if (string.IsNullOrEmpty(finalQuery))
-                {
-                    finalQuery = $"advertisingId=&appName=web&appVersion=unknown&appStoreUrl=&architecture=&buildVersion=&clientTime=0&deviceDNT=0&deviceId={plutoClient.DeviceId}&deviceMake=Chrome&deviceModel=web&deviceType=web&deviceVersion=unknown&includeExtendedEvents=false&sid={Guid.NewGuid()}&userId=&serverSideAds=true";
-                }
+                // Parse the parameters so we can safely modify them
+                var query = HttpUtility.ParseQueryString(stitcherParams);
 
-                // Modern Pluto TV requires the session token on EVERY channel
-                if (!finalQuery.Contains("jwt=") && !string.IsNullOrEmpty(token))
-                {
-                    finalQuery += $"&jwt={token}";
-                }
+                // KEY FIX: Randomize the Device ID and Session ID for every stream
+                // This tricks Pluto into treating each stream as a separate TV!
+                query["deviceId"] = Guid.NewGuid().ToString();
+                query["sid"] = Guid.NewGuid().ToString();
 
-                if (!finalQuery.Contains("masterJWTPassthrough"))
-                    finalQuery += "&masterJWTPassthrough=true";
+                // Append the required authentication and event flags
+                if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
+                query["masterJWTPassthrough"] = "true";
+                query["includeExtendedEvents"] = "true";
 
-                if (!finalQuery.Contains("includeExtendedEvents"))
-                    finalQuery += "&includeExtendedEvents=true";
-                else
-                    finalQuery = finalQuery.Replace("includeExtendedEvents=false", "includeExtendedEvents=true");
+                // Rebuild the query string and route all traffic to the v2 endpoint
+                string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                // Route all traffic through the v2 endpoint
-                string videoUrl = $"{stitcher}/v2{basePath}?{finalQuery}";
-
-                LogToConsole($"[WATCH] Stream requested for channel: {id}");
+                App.LogToConsole($"[WATCH] Stream requested for channel: {id}");
                 return Results.Redirect(videoUrl, permanent: false);
             });
-
             // 4. EPG File Route
             _host.MapGet("/{provider}/epg/{countryCode}/{filename}", (string provider, string countryCode, string filename) =>
             {

@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
+using System.Diagnostics;
 
 namespace PlutoForChannels
 {
@@ -28,12 +30,10 @@ namespace PlutoForChannels
         private void SetupSystemTrayIcon()
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
-            // We use a default Windows icon here, so we don't need to load external image files
             _notifyIcon.Icon = System.Drawing.SystemIcons.Information;
             _notifyIcon.Text = "Pluto for Channels .NET";
             _notifyIcon.Visible = true;
 
-            // Double-click the tray icon to bring the window back
             _notifyIcon.DoubleClick += (s, e) =>
             {
                 this.Show();
@@ -41,7 +41,6 @@ namespace PlutoForChannels
                 this.Activate();
             };
 
-            // Right-click context menu
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
 
             var showMenuItem = new System.Windows.Forms.ToolStripMenuItem("Show Dashboard");
@@ -52,16 +51,66 @@ namespace PlutoForChannels
                 this.Activate();
             };
 
+            // --- NEW: Run at Startup Toggle ---
+            var runAtStartupMenuItem = new System.Windows.Forms.ToolStripMenuItem("Run at Startup");
+            runAtStartupMenuItem.CheckOnClick = true;
+            
+            // Check the Windows Registry to see if it's already set to run at startup
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+            {
+                if (key?.GetValue("PlutoForChannels") != null)
+                {
+                    runAtStartupMenuItem.Checked = true;
+                }
+            }
+
+            // When the user clicks the toggle, add or remove the Registry Key
+            runAtStartupMenuItem.CheckedChanged += (s, e) =>
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    if (runAtStartupMenuItem.Checked)
+                    {
+                        // Add to startup using the exact path of where the .exe is currently running
+                        key?.SetValue("PlutoForChannels", Environment.ProcessPath!);
+                    }
+                    else
+                    {
+                        // Remove from startup
+                        key?.DeleteValue("PlutoForChannels", false);
+                    }
+                }
+            };
+
+            // --- NEW: Restart Server ---
+            var restartMenuItem = new System.Windows.Forms.ToolStripMenuItem("Restart Server");
+            restartMenuItem.Click += (s, e) =>
+            {
+                _isActualExit = true; 
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                
+                // Start a brand new instance of this exact .exe
+                Process.Start(Environment.ProcessPath!);
+                
+                // Immediately shut down this old instance
+                System.Windows.Application.Current.Shutdown();
+            };
+
             var quitMenuItem = new System.Windows.Forms.ToolStripMenuItem("Quit Server");
             quitMenuItem.Click += (s, e) =>
             {
-                _isActualExit = true; // Set the flag so we bypass the hide logic
+                _isActualExit = true; 
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
-                System.Windows.Application.Current.Shutdown(); // Actually shut down the app
+                System.Windows.Application.Current.Shutdown(); 
             };
 
+            // Build the menu
             contextMenu.Items.Add(showMenuItem);
+            contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            contextMenu.Items.Add(runAtStartupMenuItem);
+            contextMenu.Items.Add(restartMenuItem);
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             contextMenu.Items.Add(quitMenuItem);
 
@@ -163,8 +212,15 @@ namespace PlutoForChannels
 
         private void Country_Changed(object sender, RoutedEventArgs e)
         {
+            // Ignore events while the window is initially building/loading
+            if (!this.IsLoaded) return; 
+
             SaveSettings();
             App.UpdateActiveRegions();
+            
+            // Wake up the background service to generate the new XML files instantly
+            EpgService.ForceRun();
+            App.LogToConsole("[INFO] Regions changed. Forcing immediate EPG generation...");
         }
 
         private void CopyLink_Click(object sender, RoutedEventArgs e)
