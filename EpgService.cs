@@ -159,9 +159,12 @@ namespace PlutoForChannels
         programme.Add(new XElement("title", title));
 
         // 1. Handle Episode Numbers (onscreen, pluto, original-air-date)
+        string progType = series?["type"]?.ToString() ?? "";
         int season = episode?["season"]?.GetValue<int>() ?? 0;
         int number = episode?["number"]?.GetValue<int>() ?? 0;
-        if (season > 0 || number > 0)
+        
+        // Only append Season and Episode tags if the program is NOT a movie
+        if (progType != "film" && (season > 0 || number > 0))
         {
             programme.Add(new XElement("episode-num", 
                 new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
