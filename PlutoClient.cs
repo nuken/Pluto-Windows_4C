@@ -13,14 +13,11 @@ namespace PlutoForChannels
     public class PlutoClient
     {
         private readonly HttpClient _httpClient;
-        private readonly Guid _device;
-		public string DeviceId => _device.ToString();
         
         // Thread-safe caching for the session tokens (valid for 4 hours)
         private readonly ConcurrentDictionary<string, JsonNode> _responseList = new();
         private readonly ConcurrentDictionary<string, DateTime> _sessionAt = new();
 
-        // Dictionary to spoof geolocation based on country code
         private readonly Dictionary<string, string> _xForward = new()
         {
             { "local", "" },
@@ -35,17 +32,17 @@ namespace PlutoForChannels
         public PlutoClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _device = Guid.NewGuid(); // Generates a unique UUID on boot            
-            
         }
-		public void ClearCache()
+
+        public void ClearCache()
         {
             _responseList.Clear();
             _sessionAt.Clear();
         }
 
-        private (string username, string password) GetCredentials()
+        private System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
         {
+            var accounts = new System.Collections.Generic.List<(string, string)>();
             var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
             if (System.IO.File.Exists(settingsPath))
             {
@@ -54,23 +51,35 @@ namespace PlutoForChannels
                     var json = System.IO.File.ReadAllText(settingsPath);
                     using var doc = System.Text.Json.JsonDocument.Parse(json);
                     var root = doc.RootElement;
-                    string u = root.TryGetProperty("Username", out var ue) ? ue.GetString() ?? "" : "";
-                    string p = root.TryGetProperty("Password", out var pe) ? pe.GetString() ?? "" : "";
-                    return (u, p);
+                    
+                    string u1 = root.TryGetProperty("Username", out var ue) ? ue.GetString() ?? "" : "";
+                    string p1 = root.TryGetProperty("Password", out var pe) ? pe.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(u1) && !string.IsNullOrEmpty(p1)) accounts.Add((u1, p1));
+
+                    string u2 = root.TryGetProperty("Username2", out var ue2) ? ue2.GetString() ?? "" : "";
+                    string p2 = root.TryGetProperty("Password2", out var pe2) ? pe2.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(u2) && !string.IsNullOrEmpty(p2)) accounts.Add((u2, p2));
+
+                    string u3 = root.TryGetProperty("Username3", out var ue3) ? ue3.GetString() ?? "" : "";
+                    string p3 = root.TryGetProperty("Password3", out var pe3) ? pe3.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(u3) && !string.IsNullOrEmpty(p3)) accounts.Add((u3, p3));
+
+                    string u4 = root.TryGetProperty("Username4", out var ue4) ? ue4.GetString() ?? "" : "";
+                    string p4 = root.TryGetProperty("Password4", out var pe4) ? pe4.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(u4) && !string.IsNullOrEmpty(p4)) accounts.Add((u4, p4));
                 }
                 catch { }
             }
-            return ("", "");
+            if (accounts.Count == 0) accounts.Add(("", "")); // Fallback
+            return accounts;
         }
 
-        /// <summary>
-        /// Fetches the session token required for downloading channels and EPG data.
-        /// </summary>
-        public async Task<JsonNode?> GetBootDataAsync(string countryCode)
+        public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0)
         {
-            // 1. Check if we have a valid cached token (under 4 hours old)
-            if (_responseList.TryGetValue(countryCode, out var cachedResponse) && 
-                _sessionAt.TryGetValue(countryCode, out var sessionTime))
+            string cacheKey = $"{countryCode}_{accountIndex}";
+            
+            if (_responseList.TryGetValue(cacheKey, out var cachedResponse) && 
+                _sessionAt.TryGetValue(cacheKey, out var sessionTime))
             {
                 if ((DateTime.UtcNow - sessionTime).TotalHours < 4)
                 {
@@ -78,7 +87,6 @@ namespace PlutoForChannels
                 }
             }
 
-            // 2. Build the query parameters
             var query = HttpUtility.ParseQueryString(string.Empty);
             query["appName"] = "web";
             query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6";
@@ -91,7 +99,9 @@ namespace PlutoForChannels
             query["serverSideAds"] = "false";
             query["drmCapabilities"] = "widevine:L3";
 
-            var (username, password) = GetCredentials();
+            var accounts = GetValidAccounts();
+            var (username, password) = accounts[accountIndex % accounts.Count];
+            
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
                 query["username"] = username;
@@ -100,14 +110,12 @@ namespace PlutoForChannels
 
             var requestUri = $"https://boot.pluto.tv/v4/start?{query}";
 
-            // 3. Construct the HTTP Request with necessary headers
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
             request.Headers.Add("authority", "boot.pluto.tv");
             request.Headers.Add("origin", "https://pluto.tv");
             request.Headers.Add("referer", "https://pluto.tv/");
             request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
-            // Apply IP Spoofing if the country code exists in our dictionary
             if (_xForward.TryGetValue(countryCode, out var ip) && !string.IsNullOrEmpty(ip))
             {
                 request.Headers.Add("X-Forwarded-For", ip);
@@ -115,24 +123,21 @@ namespace PlutoForChannels
 
             try
             {
-                // 4. Execute the request
                 var response = await _httpClient.SendAsync(request);
                 
                 if (!response.IsSuccessStatusCode)
                 {
-                    App.LogToConsole($"[ERROR] HTTP failure {response.StatusCode} for {countryCode}");
+                    App.LogToConsole($"[ERROR] HTTP failure {response.StatusCode} for {countryCode} (Account {accountIndex % accounts.Count + 1})");
                     return null;
                 }
 
-                // Parse the JSON response
                 var jsonResponse = await response.Content.ReadFromJsonAsync<JsonNode>();
                 
                 if (jsonResponse != null)
                 {
-                    // Cache the response
-                    _responseList[countryCode] = jsonResponse;
-                    _sessionAt[countryCode] = DateTime.UtcNow;
-                    App.LogToConsole($"New token for {countryCode} generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    _responseList[cacheKey] = jsonResponse;
+                    _sessionAt[cacheKey] = DateTime.UtcNow;
+                    App.LogToConsole($"New token for {countryCode} (Account {accountIndex % accounts.Count + 1}) generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                     return jsonResponse;
                 }
             }
@@ -144,13 +149,9 @@ namespace PlutoForChannels
             return null;
         }
 		
-		/// <summary>
-        /// Translates the 'update_epg' method from pluto.py.
-        /// Fetches the EPG timelines for a specific set of channels.
-        /// </summary>
         public async Task<JsonNode?> GetTimelinesAsync(string countryCode, string channelIds, string startTime)
         {
-            var bootData = await GetBootDataAsync(countryCode);
+            var bootData = await GetBootDataAsync(countryCode, 0);
             var token = bootData?["sessionToken"]?.ToString();
 
             if (string.IsNullOrEmpty(token)) return null;
@@ -184,9 +185,6 @@ namespace PlutoForChannels
             return null;
         }
 
-        /// <summary>
-        /// Fetches channels and categories, then merges them.
-        /// </summary>
         public async Task<List<Channel>> GetChannelsAsync(string countryCode)
         {
             if (countryCode.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -194,7 +192,7 @@ namespace PlutoForChannels
                 return await GetAllChannelsAsync();
             }
 
-            var bootData = await GetBootDataAsync(countryCode);
+            var bootData = await GetBootDataAsync(countryCode, 0);
             var token = bootData?["sessionToken"]?.ToString();
 
             if (string.IsNullOrEmpty(token))
@@ -218,20 +216,17 @@ namespace PlutoForChannels
 
             try
             {
-                // 1. Fetch Channels
                 var channelsRequest = new HttpRequestMessage(HttpMethod.Get, "https://service-channels.clusters.pluto.tv/v2/guide/channels?channelIds=&offset=0&limit=1000&sort=number:asc");
                 foreach (var header in headers) channelsRequest.Headers.Add(header.Key, header.Value);
                 var channelsResponse = await _httpClient.SendAsync(channelsRequest);
                 var channelsJson = await channelsResponse.Content.ReadFromJsonAsync<JsonNode>();
                 var channelData = channelsJson?["data"]?.AsArray();
 
-                // 2. Fetch Categories (for the Group tags)
                 var categoriesRequest = new HttpRequestMessage(HttpMethod.Get, "https://service-channels.clusters.pluto.tv/v2/guide/categories");
                 foreach (var header in headers) categoriesRequest.Headers.Add(header.Key, header.Value);
                 var categoriesResponse = await _httpClient.SendAsync(categoriesRequest);
                 var categoriesJson = await categoriesResponse.Content.ReadFromJsonAsync<JsonNode>();
                 
-                // Map Category Names to Channel IDs
                 var categoryMap = new Dictionary<string, string>();
                 if (categoriesJson?["data"] is JsonArray categoriesArray)
                 {
@@ -250,7 +245,6 @@ namespace PlutoForChannels
                     }
                 }
 
-                // 3. Build the Channel List
                 var stations = new List<Channel>();
                 var existingNumbers = new HashSet<int>();
 
@@ -261,11 +255,9 @@ namespace PlutoForChannels
                         var id = elem?["id"]?.ToString();
                         var number = elem?["number"]?.GetValue<int>() ?? 0;
 
-                        // Ensure unique channel numbers
                         while (existingNumbers.Contains(number)) number++;
                         existingNumbers.Add(number);
 
-                        // Find the colorLogoPNG
                         var logoUrl = elem?["images"]?.AsArray()
                             .FirstOrDefault(img => img?["type"]?.ToString() == "colorLogoPNG")?["url"]?.ToString();
 
@@ -293,22 +285,17 @@ namespace PlutoForChannels
             }
         }
 
-        /// <summary>
-        /// Aggregates all supported countries, offsets numbers, and removes duplicates.
-        /// </summary>
         public async Task<List<Channel>> GetAllChannelsAsync()
         {
             var allChannels = new List<Channel>();
             string[] supportedCountries = { "local", "us_east", "us_west", "ca", "uk", "fr", "de" };
 
-            // Fetch all countries
             foreach (var country in supportedCountries)
             {
                 var channels = await GetChannelsAsync(country);
                 allChannels.AddRange(channels);
             }
 
-            // Deduplicate by Channel ID
             var uniqueChannels = allChannels
                 .GroupBy(c => c.Id)
                 .Select(g => g.First())
@@ -320,7 +307,6 @@ namespace PlutoForChannels
             {
                 int number = channel.Number;
                 
-                // Apply offsets based on country code
                 int offset = channel.CountryCode?.ToLower() switch
                 {
                     "ca" => 6000,
@@ -332,7 +318,6 @@ namespace PlutoForChannels
 
                 if (number < offset) number += offset;
 
-                // Ensure no collisions across regions
                 while (seenNumbers.Contains(number)) number++;
                 seenNumbers.Add(number);
 
@@ -343,9 +328,6 @@ namespace PlutoForChannels
         }
     }
 
-    /// <summary>
-    /// Represents a Pluto TV Channel mapped for our application.
-    /// </summary>
     public class Channel
     {
         public string? Id { get; set; }

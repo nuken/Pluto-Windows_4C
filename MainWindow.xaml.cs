@@ -151,6 +151,12 @@ namespace PlutoForChannels
                     // Populate UI with saved credentials
                     UsernameBox.Text = settings?.Username ?? "";
                     PasswordBox.Password = settings?.Password ?? "";
+                    UsernameBox2.Text = settings?.Username2 ?? "";
+                    PasswordBox2.Password = settings?.Password2 ?? "";
+                    UsernameBox3.Text = settings?.Username3 ?? "";
+                    PasswordBox3.Password = settings?.Password3 ?? "";
+                    UsernameBox4.Text = settings?.Username4 ?? "";
+                    PasswordBox4.Password = settings?.Password4 ?? "";
                 }
                 catch { /* Fallback to default if corrupted */ }
             }
@@ -170,7 +176,13 @@ namespace PlutoForChannels
                 var settings = new AppSettings
                 {
                     Username = UsernameBox.Text.Trim(),
-                    Password = PasswordBox.Password
+                    Password = PasswordBox.Password,
+                    Username2 = UsernameBox2.Text.Trim(),
+                    Password2 = PasswordBox2.Password,
+                    Username3 = UsernameBox3.Text.Trim(),
+                    Password3 = PasswordBox3.Password,
+                    Username4 = UsernameBox4.Text.Trim(),
+                    Password4 = PasswordBox4.Password
                 };
 
                 foreach (var r in Regions)
@@ -270,5 +282,11 @@ namespace PlutoForChannels
         public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
+        public string Username2 { get; set; } = "";
+        public string Password2 { get; set; } = "";
+        public string Username3 { get; set; } = "";
+        public string Password3 { get; set; } = "";
+        public string Username4 { get; set; } = "";
+        public string Password4 { get; set; } = "";
     }
 }

@@ -17,10 +17,11 @@ namespace PlutoForChannels
 {
     public partial class App : System.Windows.Application
     {
-		public static PlutoClient? GlobalPlutoClient { get; private set; }
         private WebApplication? _host;
         public static MainWindow? AppWindow { get; private set; }
-        private static int _currentPort = 7777; // Store port for global access
+        public static PlutoClient? GlobalPlutoClient { get; private set; }
+        private static int _currentPort = 7777; 
+        public static int StreamCounter = 0;
 
         private async void Application_Startup(object sender, StartupEventArgs e)
         {
@@ -35,7 +36,6 @@ namespace PlutoForChannels
                 targetPort = envPort;
             }
 
-            // Find an open port and store it in the static variable
             _currentPort = GetAvailablePort(targetPort);
 
             var builder = WebApplication.CreateBuilder(e.Args);
@@ -50,7 +50,7 @@ namespace PlutoForChannels
             builder.Services.AddHostedService<EpgService>();
 
             _host = builder.Build();
-			GlobalPlutoClient = _host.Services.GetRequiredService<PlutoClient>();
+            GlobalPlutoClient = _host.Services.GetRequiredService<PlutoClient>();
 
             // 1. Dashboard / Index Route
             _host.MapGet("/", (HttpContext context) => 
@@ -98,10 +98,12 @@ namespace PlutoForChannels
                 return Results.Text(sb.ToString(), "audio/x-mpegurl");
             });
 
-            // 3. Watch Route
+            // 3. Watch Route (Multi-Stream Unlocked & Round-Robin Load Balanced)
             _host.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
             {
-                var bootData = await plutoClient.GetBootDataAsync(countryCode);
+                int nextAccountIndex = System.Threading.Interlocked.Increment(ref App.StreamCounter);
+                
+                var bootData = await plutoClient.GetBootDataAsync(countryCode, nextAccountIndex);
                 if (bootData == null) return Results.StatusCode(500);
 
                 var token = bootData["sessionToken"]?.ToString() ?? "";
@@ -110,25 +112,21 @@ namespace PlutoForChannels
                 var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
                 var basePath = $"/stitch/hls/channel/{id}/master.m3u8";
 
-                // Parse the parameters so we can safely modify them
                 var query = HttpUtility.ParseQueryString(stitcherParams);
 
-                // KEY FIX: Randomize the Device ID and Session ID for every stream
-                // This tricks Pluto into treating each stream as a separate TV!
                 query["deviceId"] = Guid.NewGuid().ToString();
                 query["sid"] = Guid.NewGuid().ToString();
 
-                // Append the required authentication and event flags
                 if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
                 query["masterJWTPassthrough"] = "true";
                 query["includeExtendedEvents"] = "true";
 
-                // Rebuild the query string and route all traffic to the v2 endpoint
                 string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                App.LogToConsole($"[WATCH] Stream requested for channel: {id}");
+                LogToConsole($"[WATCH] Stream requested for channel: {id} using load-balance account #{nextAccountIndex % 4 + 1}");
                 return Results.Redirect(videoUrl, permanent: false);
             });
+
             // 4. EPG File Route
             _host.MapGet("/{provider}/epg/{countryCode}/{filename}", (string provider, string countryCode, string filename) =>
             {
@@ -146,7 +144,6 @@ namespace PlutoForChannels
                 AppWindow.StatusText.Text = $"Server: Running on Port {_currentPort}";
                 AppWindow.StatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 255, 0));
                 
-                // Refresh the new dynamic links
                 AppWindow.RefreshLinks($"{GetLocalIPAddress()}:{_currentPort}");
             }
         }
@@ -170,15 +167,24 @@ namespace PlutoForChannels
             }
         }
 
-        private int GetAvailablePort(int requestedPort)
+        private int GetAvailablePort(int startingPort)
         {
-            try {
-                var l = new TcpListener(IPAddress.Any, requestedPort);
-                l.Start(); l.Stop(); return requestedPort;
-            } catch {
-                var l = new TcpListener(IPAddress.Any, 0);
-                l.Start(); int p = ((IPEndPoint)l.LocalEndpoint).Port; l.Stop(); return p;
+            // Passively ask Windows for a list of all active TCP listeners
+            var ipGlobalProperties = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties();
+            var tcpListeners = ipGlobalProperties.GetActiveTcpListeners();
+
+            // Try the starting port (7777). If it's taken, test 7778, 7779, etc.
+            for (int port = startingPort; port < startingPort + 100; port++)
+            {
+                // If no active listener is currently using this port, it is safe to use!
+                if (!tcpListeners.Any(endpoint => endpoint.Port == port))
+                {
+                    return port;
+                }
             }
+            
+            // Extreme fallback: if 100 sequential ports are somehow taken, let the OS pick a random one
+            return 0; 
         }
 
         public static void LogToConsole(string message)
@@ -193,42 +199,29 @@ namespace PlutoForChannels
         }
 
         private static string GetLocalIPAddress()
-{
-    // Try to find the primary routing IP by simulating a connection to an external address.
-    // (This does not actually send data over the internet, it just checks the local routing table).
-    try
-    {
-        using (var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
         {
-            socket.Connect("8.8.8.8", 65530);
-            var endPoint = socket.LocalEndPoint as System.Net.IPEndPoint;
-            if (endPoint != null)
+            try
             {
-                return endPoint.Address.ToString();
+                using (var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
+                {
+                    socket.Connect("8.8.8.8", 65530);
+                    var endPoint = socket.LocalEndPoint as System.Net.IPEndPoint;
+                    if (endPoint != null) return endPoint.Address.ToString();
+                }
             }
-        }
-    }
-    catch
-    {
-        // Ignore errors and fall back to the secondary method
-    }
+            catch { }
 
-    // Fallback: manually search the adapters, heavily preferring standard home network ranges
-    var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-    foreach (var ip in host.AddressList)
-    {
-        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            string ipStr = ip.ToString();
-            // Look for standard 192.168.x.x, 10.x.x.x, or 172.16.x.x ranges
-            if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || ipStr.StartsWith("172."))
+            var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+            foreach (var ip in host.AddressList)
             {
-                return ipStr;
+                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    string ipStr = ip.ToString();
+                    if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || ipStr.StartsWith("172.")) return ipStr;
+                }
             }
-        }
-    }
 
-    return "127.0.0.1";
-}
+            return "127.0.0.1";
+        }
     }
 }

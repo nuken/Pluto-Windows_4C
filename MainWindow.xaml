@@ -1,7 +1,7 @@
 ﻿<Window x:Class="PlutoForChannels.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Pluto for Channels - .NET" Height="600" Width="800" Background="#1A1A1A">
+        Title="Pluto for Channels - .NET" Height="750" Width="800" Background="#1A1A1A">
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250"/>
@@ -19,15 +19,29 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <TextBlock Text="Authentication" Foreground="White" FontSize="18" Margin="0,0,0,10"/>
+            <TextBlock Text="Authentication (Round-Robin)" Foreground="White" FontSize="18" Margin="0,0,0,10"/>
             
-            <TextBlock Text="Username / Email" Foreground="LightGray" Margin="0,0,0,2"/>
-            <TextBox x:Name="UsernameBox" Margin="0,0,0,10" Background="#252525" Foreground="White" Padding="5"/>
-            
-            <TextBlock Text="Password" Foreground="LightGray" Margin="0,0,0,2"/>
-            <PasswordBox x:Name="PasswordBox" Margin="0,0,0,10" Background="#252525" Foreground="White" Padding="5"/>
-            
-            <Button Content="Save Login" Background="#3273DC" Foreground="White" FontWeight="Bold" 
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="250" Margin="0,0,0,10">
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Text="Account 1 (Required)" Foreground="LightGray" Margin="0,0,0,2"/>
+                    <TextBox x:Name="UsernameBox" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                    <PasswordBox x:Name="PasswordBox" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5"/>
+
+                    <TextBlock Text="Account 2 (Optional)" Foreground="LightGray" Margin="0,0,0,2"/>
+                    <TextBox x:Name="UsernameBox2" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                    <PasswordBox x:Name="PasswordBox2" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5"/>
+
+                    <TextBlock Text="Account 3 (Optional)" Foreground="LightGray" Margin="0,0,0,2"/>
+                    <TextBox x:Name="UsernameBox3" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                    <PasswordBox x:Name="PasswordBox3" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5"/>
+
+                    <TextBlock Text="Account 4 (Optional)" Foreground="LightGray" Margin="0,0,0,2"/>
+                    <TextBox x:Name="UsernameBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                    <PasswordBox x:Name="PasswordBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Button Content="Save Logins" Background="#3273DC" Foreground="White" FontWeight="Bold" 
                     Padding="8" BorderThickness="0" Cursor="Hand" Click="SaveLogin_Click"/>
         </StackPanel>
 
