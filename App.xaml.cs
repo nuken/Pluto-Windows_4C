@@ -101,9 +101,9 @@ namespace PlutoForChannels
             // 3. Watch Route (Multi-Stream Unlocked & Round-Robin Load Balanced)
             _host.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
             {
-                int nextAccountIndex = System.Threading.Interlocked.Increment(ref App.StreamCounter);
+                int nextStreamIndex = System.Threading.Interlocked.Increment(ref App.StreamCounter);
                 
-                var bootData = await plutoClient.GetBootDataAsync(countryCode, nextAccountIndex);
+                var bootData = await plutoClient.GetBootDataAsync(countryCode, nextStreamIndex, nextStreamIndex);
                 if (bootData == null) return Results.StatusCode(500);
 
                 var token = bootData["sessionToken"]?.ToString() ?? "";
@@ -123,7 +123,10 @@ namespace PlutoForChannels
 
                 string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                LogToConsole($"[WATCH] Stream requested for channel: {id} using load-balance account #{nextAccountIndex % 4 + 1}");
+                // Ask the client exactly how many accounts are filled out
+                int activeAccounts = plutoClient.GetValidAccounts().Count;
+                
+                LogToConsole($"[WATCH] Stream requested for channel: {id} using load-balance account #{nextStreamIndex % activeAccounts + 1} and virtual device #{nextStreamIndex % 10 + 1}");
                 return Results.Redirect(videoUrl, permanent: false);
             });
 

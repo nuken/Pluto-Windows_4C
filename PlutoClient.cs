@@ -28,6 +28,9 @@ namespace PlutoForChannels
             { "us_east", "108.82.206.181" },
             { "us_west", "76.81.9.69" }
         };
+		
+		// Create a pool of 10 virtual devices (unique clientIDs) to bypass stream limits
+        private readonly string[] _devicePool = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid().ToString()).ToArray();
 
         public PlutoClient(HttpClient httpClient)
         {
@@ -40,7 +43,7 @@ namespace PlutoForChannels
             _sessionAt.Clear();
         }
 
-        private System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
+        public System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
         {
             var accounts = new System.Collections.Generic.List<(string, string)>();
             var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
@@ -74,9 +77,13 @@ namespace PlutoForChannels
             return accounts;
         }
 
-        public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0)
+        public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0, int streamIndex = 0)
         {
-            string cacheKey = $"{countryCode}_{accountIndex}";
+            // Lock the stream index to our pool of 10 virtual devices
+            int deviceIndex = streamIndex % _devicePool.Length;
+            
+            // Cache tokens uniquely per country, account, AND virtual device!
+            string cacheKey = $"{countryCode}_{accountIndex}_{deviceIndex}";
             
             if (_responseList.TryGetValue(cacheKey, out var cachedResponse) && 
                 _sessionAt.TryGetValue(cacheKey, out var sessionTime))
@@ -89,12 +96,15 @@ namespace PlutoForChannels
 
             var query = HttpUtility.ParseQueryString(string.Empty);
             query["appName"] = "web";
-            query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6";
-            query["deviceVersion"] = "122.0.0";
+            query["appVersion"] = "9.19.0-7a6c115631d945c4f7327de3e03b7c474b692657"; 
+            query["deviceVersion"] = "145.0.0"; 
             query["deviceModel"] = "web";
             query["deviceMake"] = "chrome";
             query["deviceType"] = "web";
-            query["clientID"] = "c63f9fbf-47f5-40dc-941c-5628558aec87";
+            
+            // INJECT THE POOLED VIRTUAL DEVICE ID HERE
+            query["clientID"] = _devicePool[deviceIndex]; 
+            
             query["clientModelNumber"] = "1.0.0";
             query["serverSideAds"] = "false";
             query["drmCapabilities"] = "widevine:L3";
