@@ -173,8 +173,20 @@ namespace PlutoForChannels
             try
             {
                 var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+                
+                // Read the existing port so we don't accidentally overwrite it
+                int savedPort = 7777;
+                if (System.IO.File.Exists(settingsPath))
+                {
+                    try {
+                        var existing = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
+                        if (existing != null && existing.Port > 0) savedPort = existing.Port;
+                    } catch { }
+                }
+
                 var settings = new AppSettings
                 {
+                    Port = savedPort, // <--- PRESERVE THE PORT
                     Username = UsernameBox.Text.Trim(),
                     Password = PasswordBox.Password,
                     Username2 = UsernameBox2.Text.Trim(),
@@ -279,6 +291,7 @@ namespace PlutoForChannels
 	
 	public class AppSettings
     {
+		public int Port { get; set; } = 7777;
         public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";

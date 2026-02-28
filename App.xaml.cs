@@ -31,12 +31,43 @@ namespace PlutoForChannels
             LogToConsole("Initializing ASP.NET Core Web Host...");
 
             int targetPort = 7777;
+            var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            AppSettings? appSettings = null;
+
+            // 1. Read Target Port from settings.json
+            if (File.Exists(settingsPath))
+            {
+                try
+                {
+                    appSettings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(settingsPath));
+                    if (appSettings != null && appSettings.Port > 0)
+                    {
+                        targetPort = appSettings.Port;
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Allow Environment Variable to override
             if (int.TryParse(Environment.GetEnvironmentVariable("PLUTO_PORT"), out int envPort))
             {
                 targetPort = envPort;
             }
 
+            // 3. Find the best available port
             _currentPort = GetAvailablePort(targetPort);
+
+            // 4. If the port changed from what was saved, update settings.json silently
+            if (appSettings == null) appSettings = new AppSettings();
+            if (appSettings.Port != _currentPort)
+            {
+                appSettings.Port = _currentPort;
+                try
+                {
+                    File.WriteAllText(settingsPath, System.Text.Json.JsonSerializer.Serialize(appSettings));
+                }
+                catch { }
+            }
 
             var builder = WebApplication.CreateBuilder(e.Args);
 
