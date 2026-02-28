@@ -21,7 +21,7 @@
 
             <TextBlock Text="Authentication" Foreground="White" FontSize="18" Margin="0,0,0,10"/>
             
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="250" Margin="0,0,0,10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Height="350" Margin="0,0,0,10">
                 <StackPanel Margin="0,0,10,0">
                     <TextBlock Text="Account 1 (Required)" Foreground="LightGray" Margin="0,0,0,2"/>
                     <TextBox x:Name="UsernameBox" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
@@ -31,13 +31,19 @@
                     <TextBox x:Name="UsernameBox2" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
                     <PasswordBox x:Name="PasswordBox2" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5"/>
 
-                    <TextBlock Text="Account 3 (Optional)" Foreground="LightGray" Margin="0,0,0,2" Visibility="Collapsed"/>
-                    <TextBox x:Name="UsernameBox3" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5" Visibility="Collapsed"/>
-                    <PasswordBox x:Name="PasswordBox3" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5" Visibility="Collapsed"/>
+                    <CheckBox x:Name="ShowExtraAccountsToggle" Content="Show Additional Accounts" Foreground="LightGray" Margin="0,0,0,10" 
+                              Checked="ToggleExtraAccounts_Checked" Unchecked="ToggleExtraAccounts_Unchecked"/>
 
-                    <TextBlock Text="Account 4 (Optional)" Foreground="LightGray" Margin="0,0,0,2" Visibility="Collapsed"/>
-                    <TextBox x:Name="UsernameBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5" Visibility="Collapsed"/>
-                    <PasswordBox x:Name="PasswordBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5" Visibility="Collapsed"/>
+                    <StackPanel x:Name="ExtraAccountsPanel" Visibility="Collapsed">
+                        <TextBlock Text="Account 3 (Optional)" Foreground="LightGray" Margin="0,0,0,2"/>
+                        <TextBox x:Name="UsernameBox3" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                        <PasswordBox x:Name="PasswordBox3" Margin="0,0,0,15" Background="#252525" Foreground="White" Padding="5"/>
+
+                        <TextBlock Text="Account 4 (Optional)" Foreground="LightGray" Margin="0,0,0,2"/>
+                        <TextBox x:Name="UsernameBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                        <PasswordBox x:Name="PasswordBox4" Margin="0,0,0,5" Background="#252525" Foreground="White" Padding="5"/>
+                    </StackPanel>
+
                 </StackPanel>
             </ScrollViewer>
 
@@ -46,7 +52,7 @@
         </StackPanel>
 
         <StackPanel Grid.Column="1">
-            <TextBlock Text="Pluto for Channels v1.0.8a" FontSize="24" Foreground="White" FontWeight="Bold"/>
+            <TextBlock Text="Pluto for Channels v1.0.9" FontSize="24" Foreground="White" FontWeight="Bold"/>
             <TextBlock x:Name="StatusText" Text="Server: Starting..." Foreground="#3273DC" Margin="0,5,0,20"/>
 
             <TextBlock Text="Dynamic Feed Links" Foreground="White" Margin="0,0,0,5"/>
@@ -73,5 +79,4 @@
                      IsReadOnly="True" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
         </StackPanel>
     </Grid>
-
 </Window>

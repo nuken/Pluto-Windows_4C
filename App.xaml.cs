@@ -87,15 +87,99 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var html = $@"<!DOCTYPE html>
+                var version = "1.0.9"; // Matches your Windows Desktop UI version
+                
+                var sb = new StringBuilder();
+                sb.Append($@"<!DOCTYPE html>
                 <html>
-                <head><title>Pluto for Channels .NET</title><style>body {{ background-color: #1a1a1a; color: #f5f5f5; font-family: sans-serif; padding: 2rem; }} a {{ color: #3273dc; }}</style></head>
+                <head>
+                    <meta charset=""utf-8"">
+                    <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+                    <title>Pluto for Channels .NET</title>
+                    <style>
+                        body {{ background-color: #1a1a1a; color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 2rem; }}
+                        h1 {{ color: #ffffff; margin-bottom: 5px; }}
+                        .tag {{ background-color: #3273dc; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.45em; vertical-align: middle; margin-left: 10px; }}
+                        .container {{ max-width: 900px; margin: 0 auto; background-color: #252525; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+                        .list-item {{ display: flex; align-items: center; justify-content: space-between; padding: 15px; border-bottom: 1px solid #363636; }}
+                        .list-item:last-child {{ border-bottom: none; }}
+                        a {{ color: #3273dc; text-decoration: none; word-break: break-all; margin-right: 15px; font-family: Consolas, monospace; font-size: 15px; }}
+                        a:hover {{ color: #4e8ff1; text-decoration: underline; }}
+                        .copy-button {{ background-color: #3273dc; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; font-weight: bold; flex-shrink: 0; }}
+                        .copy-button:hover {{ background-color: #4e8ff1; }}
+                        .label {{ font-weight: bold; color: #aaaaaa; margin-right: 15px; min-width: 120px; display: inline-block; }}
+                    </style>
+                    <script>
+                        // Uses the legacy execCommand to ensure compatibility when accessing via local network IPs without HTTPS
+                        function copyToClipboard(text, btn) {{
+                            const textarea = document.createElement('textarea');
+                            textarea.value = text;
+                            textarea.style.position = 'fixed';
+                            textarea.style.left = '-9999px';
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            try {{
+                                document.execCommand('copy');
+                                var originalText = btn.innerText;
+                                btn.innerText = 'Copied!';
+                                btn.style.backgroundColor = '#48c774'; // Green success color
+                                setTimeout(function() {{
+                                    btn.innerText = originalText;
+                                    btn.style.backgroundColor = '#3273dc'; // Back to blue
+                                }}, 2000);
+                            }} catch (err) {{
+                                console.error('Fallback: Oops, unable to copy', err);
+                            }}
+                            document.body.removeChild(textarea);
+                        }}
+                    </script>
+                </head>
                 <body>
-                    <h1>Pluto for Channels .NET</h1>
-                    <p>API is running.</p>
+                    <div class=""container"">
+                        <h1>Pluto for Channels .NET <span class=""tag"">v{version}</span></h1>
+                        <p style=""color: #888; margin-bottom: 25px;"">Background proxy server is actively running.</p>
+                        <div style=""background-color: #1a1a1a; border-radius: 6px; padding: 5px;"">");
+
+                // Get the regions the user currently has checked in the desktop app
+                var activeRegions = AppWindow?.Regions?.Where(r => r.IsSelected).Select(r => r.Name).ToList() ?? new System.Collections.Generic.List<string>();
+
+                if (activeRegions.Count == 0)
+                {
+                    sb.Append("<p style=\"padding: 15px; color: #ff6b6b;\">No regions selected. Please configure your regions in the desktop dashboard.</p>");
+                }
+                else
+                {
+                    // Generate a beautiful copy block for every active region
+                    foreach (var region in activeRegions)
+                    {
+                        string m3uUrl = $"http://{host}/pluto/{region}/playlist.m3u";
+                        string epgUrl = $"http://{host}/pluto/epg/{region}/epg-{region}.xml";
+
+                        sb.Append($@"
+                            <div class=""list-item"">
+                                <div>
+                                    <span class=""label"">{region.ToUpper()} M3U:</span>
+                                    <a href=""{m3uUrl}"" target=""_blank"">{m3uUrl}</a>
+                                </div>
+                                <button class=""copy-button"" onclick=""copyToClipboard('{m3uUrl}', this)"">Copy</button>
+                            </div>
+                            <div class=""list-item"">
+                                <div>
+                                    <span class=""label"">{region.ToUpper()} EPG:</span>
+                                    <a href=""{epgUrl}"" target=""_blank"">{epgUrl}</a>
+                                </div>
+                                <button class=""copy-button"" onclick=""copyToClipboard('{epgUrl}', this)"">Copy</button>
+                            </div>");
+                    }
+                }
+
+                sb.Append(@"
+                        </div>
+                    </div>
                 </body>
-                </html>";
-                return Results.Content(html, "text/html");
+                </html>");
+
+                return Results.Content(sb.ToString(), "text/html");
             });
 
             // 2. Playlist M3U Route
