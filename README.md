@@ -1,6 +1,6 @@
 # PlutoForChannels-Windows
 
-A native Windows bridge for integrating Pluto TV channels into Channels DVR. This application replaces the need for Docker by providing a standalone `.exe` that runs in your system tray, manages M3U playlists, and automatically updates EPG data. Username and Password fields have been added to the dashboard to work with the latest changes to the Pluto API. 
+A native Windows bridge for integrating Pluto TV channels into Channels DVR. It should work with other media players too. This application replaces the need for Docker by providing a standalone `.exe` that runs in your system tray, manages M3U playlists, and automatically updates EPG data. Username and Password fields have been added to the dashboard to work with the latest changes to the Pluto API. 
 
 ## Features
 
