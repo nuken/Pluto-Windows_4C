@@ -158,13 +158,36 @@ namespace PlutoForChannels
 
         programme.Add(new XElement("title", title));
 
-        // 1. Handle Episode Numbers (onscreen, pluto, original-air-date)
+        // 1. Add Description and Program Icon
+        if (!string.IsNullOrEmpty(desc)) 
+        {
+            programme.Add(new XElement("desc", desc));
+        }
+        
+        string progIcon = series?["tile"]?["path"]?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(progIcon))
+        {
+            programme.Add(new XElement("icon", new XAttribute("src", progIcon)));
+        }
+
+        // 2. Handle Live Tags and Episode Numbers (onscreen, pluto)
         string progType = series?["type"]?.ToString() ?? "";
         int season = episode?["season"]?.GetValue<int>() ?? 0;
         int number = episode?["number"]?.GetValue<int>() ?? 0;
-        
-        // Only append Season and Episode tags if the program is NOT a movie
-        if (progType != "film" && (season > 0 || number > 0))
+
+        if (progType == "live")
+        {
+            // Trust Pluto's "live" flag regardless of the release date
+            programme.Add(new XElement("live"));
+            
+            // Suppress meaningless "Season 1, Episode 0" for live news broadcasts
+            if (season > 0 && number > 0)
+            {
+                programme.Add(new XElement("episode-num", 
+                    new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
+            }
+        }
+        else if (progType != "film" && (season > 0 || number > 0))
         {
             programme.Add(new XElement("episode-num", 
                 new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
@@ -176,41 +199,35 @@ namespace PlutoForChannels
             programme.Add(new XElement("episode-num", new XAttribute("system", "pluto"), episodeId));
         }
 
+        // 3. Date and Original Air Date parsing
         if (!string.IsNullOrEmpty(airDateRaw))
         {
-            programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDateRaw));
-            
-            // Add <date> tag in YYYYMMDD format
-            if (DateTime.TryParse(airDateRaw, out DateTime airDt))
+            if (DateTime.TryParse(airDateRaw, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime airDt))
             {
-                programme.Add(new XElement("date", airDt.ToString("yyyyMMdd")));
+                // Suppress BOTH tags if it evaluates to the 1969/1970 Unix Epoch placeholder
+                if (airDt.Year > 1970)
+                {
+                    programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDateRaw));
+                    programme.Add(new XElement("date", airDt.ToString("yyyyMMdd")));
+                }
             }
         }
 
-        // 2. Add Description and Program Icon
-        if (!string.IsNullOrEmpty(desc)) programme.Add(new XElement("desc", desc));
-        
-        string progIcon = series?["tile"]?["path"]?.ToString() ?? "";
-        if (!string.IsNullOrEmpty(progIcon))
-        {
-            programme.Add(new XElement("icon", new XAttribute("src", progIcon)));
-        }
-
-        // 3. Series ID
+        // 4. Series ID
         string seriesId = series?["_id"]?.ToString() ?? "";
         if (!string.IsNullOrEmpty(seriesId))
         {
             programme.Add(new XElement("series-id", new XAttribute("system", "pluto"), seriesId));
         }
 
-        // 4. Sub-Title (if different from title)
+        // 5. Sub-Title (if different from title)
         string epName = episode?["name"]?.ToString() ?? "";
         if (!string.IsNullOrEmpty(epName) && !epName.Equals(title, StringComparison.OrdinalIgnoreCase))
         {
             programme.Add(new XElement("sub-title", StripIllegalCharacters(epName)));
         }
 
-        // 5. Category/Genre Mapping
+        // 6. Category/Genre Mapping
         var categories = GetMappedCategories(episode?["genre"]?.ToString(), episode?["subGenre"]?.ToString(), series?["type"]?.ToString());
         foreach (var cat in categories)
         {
