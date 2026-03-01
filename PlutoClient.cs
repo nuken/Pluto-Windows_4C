@@ -42,6 +42,11 @@ namespace PlutoForChannels
             _responseList.Clear();
             _sessionAt.Clear();
         }
+		
+		public string GetDeviceId(int streamIndex)
+        {
+            return _devicePool[streamIndex % _devicePool.Length];
+        }
 
         public System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
         {

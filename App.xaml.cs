@@ -87,7 +87,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.1.0"; // Matches your Windows Desktop UI version
+                var version = "1.1.1"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
@@ -213,12 +213,14 @@ namespace PlutoForChannels
                 return Results.Text(sb.ToString(), "audio/x-mpegurl");
             });
 
-            // 3. Watch Route (Multi-Stream Unlocked & Round-Robin Load Balanced)
+            // 3. Watch Route (Multi-Stream Unlocked & Deterministically Load Balanced)
             _host.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
             {
-                int nextStreamIndex = System.Threading.Interlocked.Increment(ref App.StreamCounter);
+                // FIX 1: Lock the index to the Channel ID instead of a rolling counter.
+                // This guarantees reconnects during ad breaks stay on the exact same account and device!
+                int streamIndex = Math.Abs(id.GetHashCode());
                 
-                var bootData = await plutoClient.GetBootDataAsync(countryCode, nextStreamIndex, nextStreamIndex);
+                var bootData = await plutoClient.GetBootDataAsync(countryCode, streamIndex, streamIndex);
                 if (bootData == null) return Results.StatusCode(500);
 
                 var token = bootData["sessionToken"]?.ToString() ?? "";
@@ -229,8 +231,9 @@ namespace PlutoForChannels
 
                 var query = HttpUtility.ParseQueryString(stitcherParams);
 
-                query["deviceId"] = Guid.NewGuid().ToString();
-                query["sid"] = Guid.NewGuid().ToString();
+                // FIX 2: Ensure the Stitcher deviceId perfectly matches the boot clientID
+                query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
+                query["sid"] = Guid.NewGuid().ToString(); 
 
                 if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
                 query["masterJWTPassthrough"] = "true";
@@ -238,10 +241,8 @@ namespace PlutoForChannels
 
                 string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                // Ask the client exactly how many accounts are filled out
                 int activeAccounts = plutoClient.GetValidAccounts().Count;
-                
-                LogToConsole($"[WATCH] Stream requested for channel: {id} using load-balance account #{nextStreamIndex % activeAccounts + 1} and virtual device #{nextStreamIndex % 10 + 1}");
+                LogToConsole($"[WATCH] Stream requested for channel: {id} locked to account #{streamIndex % activeAccounts + 1} and virtual device #{streamIndex % 10 + 1}");
                 return Results.Redirect(videoUrl, permanent: false);
             });
 
