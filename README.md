@@ -24,7 +24,7 @@ A native Windows bridge for integrating Pluto TV channels into Channels DVR. It 
 3. In your **Channels DVR Web Admin**, go to **Settings** > **Sources** > **Add Source** > **Custom Channels**.
 4. **M3U URL**: Copy the M3U link from the PlutoForChannels dashboard (e.g., `http://localhost:7777/pluto/all/playlist.m3u`).
 5. **XMLTV URL**: Copy the EPG link from the dashboard (e.g., `http://localhost:7777/pluto/epg/all/epg-all.xml`).
-6. Set the **Refresh Interval** to "6 hours."
+6. Set the format to MPEG-TS and **Refresh Interval** to "6 hours."
 
 ## Build from Source
 
