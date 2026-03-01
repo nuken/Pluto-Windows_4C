@@ -19,12 +19,14 @@ namespace PlutoForChannels
         private static CancellationTokenSource _delayTokenSource = new CancellationTokenSource();
 
         public static void ForceRun()
-        {
-            if (!_delayTokenSource.IsCancellationRequested)
-            {
-                _delayTokenSource.Cancel();
-            }
-        }
+{
+    var cts = _delayTokenSource; // Thread-safe reference copy
+    if (cts != null && !cts.IsCancellationRequested)
+    {
+        try { cts.Cancel(); } 
+        catch (ObjectDisposedException) { /* Safely ignore */ }
+    }
+}
 		
 		public EpgService(PlutoClient plutoClient)
         {
@@ -246,10 +248,12 @@ namespace PlutoForChannels
 
             var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), new XDocumentType("tv", null, "xmltv.dtd", null), tvElement);
 
-            using (var fileStream = new FileStream(xmlFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                doc.Save(fileStream);
-            }
+           string tempXmlPath = xmlFilePath + ".tmp";
+using (var fileStream = new FileStream(tempXmlPath, FileMode.Create, FileAccess.Write, FileShare.None))
+{
+    doc.Save(fileStream);
+}
+File.Move(tempXmlPath, xmlFilePath, overwrite: true);
 
             using (var originalFileStream = new FileStream(xmlFilePath, FileMode.Open, FileAccess.Read))
             using (var compressedFileStream = new FileStream(gzFilePath, FileMode.Create, FileAccess.Write))
@@ -266,14 +270,14 @@ namespace PlutoForChannels
         }
 
         private string ParsePlutoTime(string? timeString)
-        {
-            if (string.IsNullOrEmpty(timeString)) return "";
-            if (DateTime.TryParse(timeString, out DateTime dt))
-            {
-                return dt.ToUniversalTime().ToString("yyyyMMddHHmmss +0000");
-            }
-            return "";
-        }
+{
+    if (string.IsNullOrEmpty(timeString)) return "";
+    if (DateTime.TryParse(timeString, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime dt))
+    {
+        return dt.ToString("yyyyMMddHHmmss +0000"); // ToUniversalTime() is no longer needed since it's already adjusted
+    }
+    return "";
+}
 		private List<string> GetMappedCategories(string? genre, string? subGenre, string? type)
 {
     var categories = new HashSet<string>();

@@ -75,9 +75,9 @@ namespace PlutoForChannels
             {
                 serverOptions.ListenAnyIP(_currentPort);
             });
-
-            builder.Services.AddHttpClient();
-            builder.Services.AddSingleton<PlutoClient>(); 
+			
+            builder.Services.AddMemoryCache();
+            builder.Services.AddHttpClient<PlutoClient>();
             builder.Services.AddHostedService<EpgService>();
 
             _host = builder.Build();
@@ -87,7 +87,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.1.1"; // Matches your Windows Desktop UI version
+                var version = "1.1.2"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
@@ -218,7 +218,7 @@ namespace PlutoForChannels
             {
                 // FIX 1: Lock the index to the Channel ID instead of a rolling counter.
                 // This guarantees reconnects during ad breaks stay on the exact same account and device!
-                int streamIndex = Math.Abs(id.GetHashCode());
+                int streamIndex = id.GetHashCode() & int.MaxValue;
                 
                 var bootData = await plutoClient.GetBootDataAsync(countryCode, streamIndex, streamIndex);
                 if (bootData == null) return Results.StatusCode(500);
@@ -241,8 +241,8 @@ namespace PlutoForChannels
 
                 string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                int activeAccounts = plutoClient.GetValidAccounts().Count;
-                LogToConsole($"[WATCH] Stream requested for channel: {id} locked to account #{streamIndex % activeAccounts + 1} and virtual device #{streamIndex % 10 + 1}");
+                int activeAccounts = Math.Max(1, plutoClient.GetValidAccounts().Count);
+                LogToConsole($"[WATCH] ... account #{streamIndex % activeAccounts + 1} ...");
                 return Results.Redirect(videoUrl, permanent: false);
             });
 
