@@ -1,7 +1,4 @@
 using System;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Primitives;
-using System.Threading;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,14 +11,15 @@ using System.Web;
 namespace PlutoForChannels
 {
     public class PlutoClient
-{
-    private readonly HttpClient _httpClient;
-    private readonly IMemoryCache _memoryCache;
-    
-    private CancellationTokenSource _cacheEvictionTokenSource = new CancellationTokenSource();
-
-    private readonly Dictionary<string, string> _xForward = new()
     {
+        private readonly HttpClient _httpClient;
+        
+        // Thread-safe caching for the session tokens (valid for 4 hours)
+        private readonly ConcurrentDictionary<string, JsonNode> _responseList = new();
+        private readonly ConcurrentDictionary<string, DateTime> _sessionAt = new();
+
+        private readonly Dictionary<string, string> _xForward = new()
+        {
             { "local", "" },
             { "uk", "178.238.11.6" },
             { "ca", "192.206.151.131" },
@@ -30,31 +28,19 @@ namespace PlutoForChannels
             { "us_east", "108.82.206.181" },
             { "us_west", "76.81.9.69" }
         };
-		
-		// Create a pool of 10 virtual devices (unique clientIDs) to bypass stream limits
-    private readonly string[] _devicePool = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid().ToString()).ToArray();
 
-    // Inject IMemoryCache alongside HttpClient
-    public PlutoClient(HttpClient httpClient, IMemoryCache memoryCache)
-    {
-        _httpClient = httpClient;
-        _memoryCache = memoryCache;
-    }
-
-    public void ClearCache()
-    {
-        // Cancel the token to instantly invalidate all cached items
-        _cacheEvictionTokenSource.Cancel();
-        _cacheEvictionTokenSource.Dispose();
-        _cacheEvictionTokenSource = new CancellationTokenSource();
-    }
-		
-		public string GetDeviceId(int streamIndex)
+        public PlutoClient(HttpClient httpClient)
         {
-            return _devicePool[streamIndex % _devicePool.Length];
+            _httpClient = httpClient;
         }
 
-        public System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
+        public void ClearCache()
+        {
+            _responseList.Clear();
+            _sessionAt.Clear();
+        }
+
+        private System.Collections.Generic.List<(string username, string password)> GetValidAccounts()
         {
             var accounts = new System.Collections.Generic.List<(string, string)>();
             var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
@@ -88,85 +74,80 @@ namespace PlutoForChannels
             return accounts;
         }
 
-        public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0, int streamIndex = 0)
-{
-    // Lock the stream index to our pool of 10 virtual devices
-    int deviceIndex = streamIndex % _devicePool.Length;
-    
-    // Cache tokens uniquely per country, account, AND virtual device!
-    string cacheKey = $"{countryCode}_{accountIndex}_{deviceIndex}";
-
-    // GetOrCreateAsync atomically checks the cache and blocks other threads from
-    // making duplicate API requests if a fetch is already in progress.
-    return await _memoryCache.GetOrCreateAsync(cacheKey, async cacheEntry =>
-    {
-        // Tokens expire gracefully after 4 hours and are garbage collected
-        cacheEntry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4);
-        
-        // Link the cache entry to our master eviction token so we can wipe it on demand
-        cacheEntry.AddExpirationToken(new CancellationChangeToken(_cacheEvictionTokenSource.Token));
-
-        var query = HttpUtility.ParseQueryString(string.Empty);
-        query["appName"] = "web";
-        query["appVersion"] = "9.19.0-7a6c115631d945c4f7327de3e03b7c474b692657"; 
-        query["deviceVersion"] = "145.0.0"; 
-        query["deviceModel"] = "web";
-        query["deviceMake"] = "chrome";
-        query["deviceType"] = "web";
-        query["clientID"] = _devicePool[deviceIndex]; 
-        query["clientModelNumber"] = "1.0.0";
-        query["serverSideAds"] = "false";
-        query["drmCapabilities"] = "widevine:L3";
-
-        var accounts = GetValidAccounts();
-        var (username, password) = accounts[accountIndex % accounts.Count];
-        
-        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+        public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0)
         {
-            query["username"] = username;
-            query["password"] = password;
-        }
-
-        var requestUri = $"https://boot.pluto.tv/v4/start?{query}";
-        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        request.Headers.Add("authority", "boot.pluto.tv");
-        request.Headers.Add("origin", "https://pluto.tv");
-        request.Headers.Add("referer", "https://pluto.tv/");
-        request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-
-        if (_xForward.TryGetValue(countryCode, out var ip) && !string.IsNullOrEmpty(ip))
-        {
-            request.Headers.Add("X-Forwarded-For", ip);
-        }
-
-        try
-        {
-            var response = await _httpClient.SendAsync(request);
+            string cacheKey = $"{countryCode}_{accountIndex}";
             
-            if (!response.IsSuccessStatusCode)
+            if (_responseList.TryGetValue(cacheKey, out var cachedResponse) && 
+                _sessionAt.TryGetValue(cacheKey, out var sessionTime))
             {
-                App.LogToConsole($"[ERROR] HTTP failure {response.StatusCode} for {countryCode} (Account {accountIndex % accounts.Count + 1})");
-                return null;
+                if ((DateTime.UtcNow - sessionTime).TotalHours < 4)
+                {
+                    return cachedResponse;
+                }
             }
 
-            var jsonResponse = await response.Content.ReadFromJsonAsync<JsonNode>();
-            
-            if (jsonResponse != null)
-            {
-                App.LogToConsole($"New token for {countryCode} (Account {accountIndex % accounts.Count + 1}) generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                return jsonResponse;
-            }
-        }
-        catch (Exception ex)
-        {
-            App.LogToConsole($"[ERROR] Exception fetching boot data: {ex.Message}");
-        }
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            query["appName"] = "web";
+            query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6";
+            query["deviceVersion"] = "122.0.0";
+            query["deviceModel"] = "web";
+            query["deviceMake"] = "chrome";
+            query["deviceType"] = "web";
+            query["clientID"] = "c63f9fbf-47f5-40dc-941c-5628558aec87";
+            query["clientModelNumber"] = "1.0.0";
+            query["serverSideAds"] = "false";
+            query["drmCapabilities"] = "widevine:L3";
 
-        // If it fails, expire immediately so the next request tries again
-        cacheEntry.AbsoluteExpirationRelativeToNow = TimeSpan.Zero;
-        return null;
-    });
-}
+            var accounts = GetValidAccounts();
+            var (username, password) = accounts[accountIndex % accounts.Count];
+            
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            {
+                query["username"] = username;
+                query["password"] = password;
+            }
+
+            var requestUri = $"https://boot.pluto.tv/v4/start?{query}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+            request.Headers.Add("authority", "boot.pluto.tv");
+            request.Headers.Add("origin", "https://pluto.tv");
+            request.Headers.Add("referer", "https://pluto.tv/");
+            request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+
+            if (_xForward.TryGetValue(countryCode, out var ip) && !string.IsNullOrEmpty(ip))
+            {
+                request.Headers.Add("X-Forwarded-For", ip);
+            }
+
+            try
+            {
+                var response = await _httpClient.SendAsync(request);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    App.LogToConsole($"[ERROR] HTTP failure {response.StatusCode} for {countryCode} (Account {accountIndex % accounts.Count + 1})");
+                    return null;
+                }
+
+                var jsonResponse = await response.Content.ReadFromJsonAsync<JsonNode>();
+                
+                if (jsonResponse != null)
+                {
+                    _responseList[cacheKey] = jsonResponse;
+                    _sessionAt[cacheKey] = DateTime.UtcNow;
+                    App.LogToConsole($"New token for {countryCode} (Account {accountIndex % accounts.Count + 1}) generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    return jsonResponse;
+                }
+            }
+            catch (Exception ex)
+            {
+                App.LogToConsole($"[ERROR] Exception fetching boot data: {ex.Message}");
+            }
+
+            return null;
+        }
 		
         public async Task<JsonNode?> GetTimelinesAsync(string countryCode, string channelIds, string startTime)
         {

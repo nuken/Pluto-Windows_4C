@@ -157,11 +157,6 @@ namespace PlutoForChannels
                     PasswordBox3.Password = settings?.Password3 ?? "";
                     UsernameBox4.Text = settings?.Username4 ?? "";
                     PasswordBox4.Password = settings?.Password4 ?? "";
-				// Auto-expand the UI if the user has data saved in Account 3 or 4
-                    if (!string.IsNullOrEmpty(settings?.Username3) || !string.IsNullOrEmpty(settings?.Username4))
-                    {
-                        ShowExtraAccountsToggle.IsChecked = true;
-                    }	
                 }
                 catch { /* Fallback to default if corrupted */ }
             }
@@ -178,20 +173,8 @@ namespace PlutoForChannels
             try
             {
                 var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
-                
-                // Read the existing port so we don't accidentally overwrite it
-                int savedPort = 7777;
-                if (System.IO.File.Exists(settingsPath))
-                {
-                    try {
-                        var existing = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
-                        if (existing != null && existing.Port > 0) savedPort = existing.Port;
-                    } catch { }
-                }
-
                 var settings = new AppSettings
                 {
-                    Port = savedPort, // <--- PRESERVE THE PORT
                     Username = UsernameBox.Text.Trim(),
                     Password = PasswordBox.Password,
                     Username2 = UsernameBox2.Text.Trim(),
@@ -288,27 +271,14 @@ namespace PlutoForChannels
                     System.Windows.MessageBox.Show("Could not access the clipboard. Another application might be locking it.", "Clipboard Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 }
             }
-        } // End of CopyLink_Click
-
-        // The two new toggle methods correctly placed INSIDE the MainWindow class:
-        private void ToggleExtraAccounts_Checked(object sender, RoutedEventArgs e)
-        {
-            if (ExtraAccountsPanel != null) ExtraAccountsPanel.Visibility = Visibility.Visible;
         }
-
-        private void ToggleExtraAccounts_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (ExtraAccountsPanel != null) ExtraAccountsPanel.Visibility = Visibility.Collapsed;
-        }
-
-    } // <--- THIS is the closing brace for the MainWindow class
+    }
 
     public class RegionOption { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
     public class FeedLink { public string Title { get; set; } = ""; public string Url { get; set; } = ""; }
-    
-    public class AppSettings
+	
+	public class AppSettings
     {
-        public int Port { get; set; } = 7777;
         public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
