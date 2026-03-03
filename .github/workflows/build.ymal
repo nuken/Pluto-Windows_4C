@@ -2,7 +2,7 @@ name: Build PlutoForChannels EXE
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "original", "one" ]
   workflow_dispatch: # Allows you to manually trigger a build from the GitHub website
 
 jobs:
@@ -24,5 +24,5 @@ jobs:
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: PlutoForChannels-Windows-x64
-        path: bin/Release/net8.0-windows/win-x64/publish/PlutoForChannels.exe
+        name: PlutoForChannels-Windows-O-x64
+        path: bin/Release/net8.0-windows/win-x64/publish/PlutoForChannelsO.exe
