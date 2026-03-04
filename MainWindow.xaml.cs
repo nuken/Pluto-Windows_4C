@@ -72,7 +72,7 @@ namespace PlutoForChannels
                     if (runAtStartupMenuItem.Checked)
                     {
                         // Add to startup using the exact path of where the .exe is currently running
-                        key?.SetValue("PlutoForChannels", Environment.ProcessPath!);
+                        key?.SetValue("PlutoForChannels", $"\"{Environment.ProcessPath}\"");
                     }
                     else
                     {
