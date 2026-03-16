@@ -198,10 +198,23 @@ namespace PlutoForChannels
         string episodeId = episode?["_id"]?.ToString() ?? "";
         if (!string.IsNullOrEmpty(episodeId))
         {
+            // Append the start timestamp to the episode ID for live programs so Channels DVR doesn't skip them as duplicates
+            if (progType == "live" && !string.IsNullOrEmpty(start))
+            {
+                string timeStamp = start.Split(' ')[0]; // Extracts "yyyyMMddHHmmss" from the parsed time
+                episodeId = $"{episodeId}_{timeStamp}";
+            }
             programme.Add(new XElement("episode-num", new XAttribute("system", "pluto"), episodeId));
         }
 
         // 3. Date and Original Air Date parsing
+        if (progType == "live")
+        {
+            // Force the broadcast start time as the original air date for all live shows.
+            // This overwrites any "dummy" dates Pluto might pass through the API.
+            airDateRaw = timeline?["start"]?.ToString() ?? "";
+        }
+
         if (!string.IsNullOrEmpty(airDateRaw))
         {
             if (DateTime.TryParse(airDateRaw, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime airDt))
@@ -209,7 +222,7 @@ namespace PlutoForChannels
                 // Suppress BOTH tags if it evaluates to the 1969/1970 Unix Epoch placeholder
                 if (airDt.Year > 1970)
                 {
-                    programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDateRaw));
+                    programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDt.ToString("yyyy-MM-dd HH:mm:ss")));
                     programme.Add(new XElement("date", airDt.ToString("yyyyMMdd")));
                 }
             }
