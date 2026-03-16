@@ -181,6 +181,7 @@ namespace PlutoForChannels
         {
             // Trust Pluto's "live" flag regardless of the release date
             programme.Add(new XElement("live"));
+			programme.Add(new XElement("new"));
             
             // Suppress meaningless "Season 1, Episode 0" for live news broadcasts
             if (season > 0 && number > 0)
