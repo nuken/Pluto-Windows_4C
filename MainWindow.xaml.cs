@@ -56,7 +56,7 @@ namespace PlutoForChannels
             runAtStartupMenuItem.CheckOnClick = true;
             
             // Check the Windows Registry to see if it's already set to run at startup
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+            using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
             {
                 if (key?.GetValue("PlutoForChannels") != null)
                 {
@@ -67,7 +67,7 @@ namespace PlutoForChannels
             // When the user clicks the toggle, add or remove the Registry Key
             runAtStartupMenuItem.CheckedChanged += (s, e) =>
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
                 {
                     if (runAtStartupMenuItem.Checked)
                     {
