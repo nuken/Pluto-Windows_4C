@@ -81,6 +81,44 @@ namespace PlutoForChannels
                     }
                 }
             };
+			
+			// --- NEW: Start Hidden Toggle ---
+var startHiddenMenuItem = new System.Windows.Forms.ToolStripMenuItem("Start Hidden on Boot");
+startHiddenMenuItem.CheckOnClick = true;
+
+// 1. Check current settings to see if it should be checked
+var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+if (System.IO.File.Exists(settingsPath))
+{
+    try
+    {
+        var existingSettings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
+        if (existingSettings != null) startHiddenMenuItem.Checked = existingSettings.StartHidden;
+    }
+    catch { }
+}
+
+// 2. Action when clicked: Save setting and restart app
+startHiddenMenuItem.CheckedChanged += (s, e) =>
+{
+    // Read the file, update the flag, and save it back without touching other settings
+    AppSettings currentSettings = new AppSettings();
+    if (System.IO.File.Exists(settingsPath))
+    {
+        try { currentSettings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath)) ?? new AppSettings(); }
+        catch { }
+    }
+    
+    currentSettings.StartHidden = startHiddenMenuItem.Checked;
+    System.IO.File.WriteAllText(settingsPath, System.Text.Json.JsonSerializer.Serialize(currentSettings));
+
+    // Restart the server to apply the change immediately
+    _isActualExit = true; 
+    _notifyIcon.Visible = false;
+    _notifyIcon.Dispose();
+    Process.Start(Environment.ProcessPath!);
+    System.Windows.Application.Current.Shutdown();
+};
 
             // --- NEW: Restart Server ---
             var restartMenuItem = new System.Windows.Forms.ToolStripMenuItem("Restart Server");
@@ -110,6 +148,7 @@ namespace PlutoForChannels
             contextMenu.Items.Add(showMenuItem);
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             contextMenu.Items.Add(runAtStartupMenuItem);
+			contextMenu.Items.Add(startHiddenMenuItem);
             contextMenu.Items.Add(restartMenuItem);
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             contextMenu.Items.Add(quitMenuItem);
@@ -289,6 +328,62 @@ namespace PlutoForChannels
                 }
             }
         } // End of CopyLink_Click
+		
+		private async void CheckVersion_Click(object sender, RoutedEventArgs e)
+        {
+            // The current version of this build
+            string currentVersion = "v1.1.6"; 
+            
+            // The raw URL to your GitHub text file
+            string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/main/version.txt";
+            
+            // The URL to your GitHub releases page
+            string releasesUrl = "https://github.com/nuken/Pluto-Windows_4C/releases/latest";
+            
+            try
+            {
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    // GitHub sometimes requires a User-Agent header
+                    client.DefaultRequestHeaders.Add("User-Agent", "PlutoForChannels-UpdateChecker");
+                    
+                    // Fetch the text from GitHub
+                    string fetchedVersion = await client.GetStringAsync(versionUrl);
+                    fetchedVersion = fetchedVersion.Trim(); // Remove any accidental newlines or spaces
+
+                    // Compare the versions
+                    if (string.Equals(currentVersion, fetchedVersion, StringComparison.OrdinalIgnoreCase))
+                    {
+                        System.Windows.MessageBox.Show($"You are up to date! (Current: {currentVersion})", "Version Check", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        // Ask the user if they want to download the update
+                        var result = System.Windows.MessageBox.Show(
+                            $"A new version is available!\n\nCurrent: {currentVersion}\nLatest: {fetchedVersion}\n\nWould you like to open the GitHub releases page to download the new version?", 
+                            "Update Available", 
+                            System.Windows.MessageBoxButton.YesNo, 
+                            System.Windows.MessageBoxImage.Question);
+
+                        // If they click "Yes", open their default web browser
+                        if (result == System.Windows.MessageBoxResult.Yes)
+                        {
+                            // In modern .NET, UseShellExecute = true is required to open URLs
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = releasesUrl,
+                                UseShellExecute = true
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.LogToConsole($"[ERROR] Version check failed: {ex.Message}");
+                System.Windows.MessageBox.Show("Could not check for updates. Ensure you have an internet connection, or check the logs for details.", "Version Check Failed", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
 
         // The two new toggle methods correctly placed INSIDE the MainWindow class:
         private void ToggleExtraAccounts_Checked(object sender, RoutedEventArgs e)
@@ -309,6 +404,7 @@ namespace PlutoForChannels
     public class AppSettings
     {
         public int Port { get; set; } = 7777;
+		public bool StartHidden { get; set; } = false;
         public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
