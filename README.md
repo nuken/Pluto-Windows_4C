@@ -28,7 +28,7 @@ A native Windows bridge for integrating Pluto TV channels into Channels DVR. It 
 
 ## Build from Source
 
-If you want to build the executable yourself using the .NET 8 SDK:
+If you want to build the executable yourself using the .NET 10 SDK:
 
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:ApplicationIcon=icon.ico
