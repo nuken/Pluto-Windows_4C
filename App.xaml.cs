@@ -319,29 +319,36 @@ namespace PlutoForChannels
         }
 
         private static string GetLocalIPAddress()
-        {
-            try
-            {
-                using (var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
-                {
-                    socket.Connect("8.8.8.8", 65530);
-                    var endPoint = socket.LocalEndPoint as System.Net.IPEndPoint;
-                    if (endPoint != null) return endPoint.Address.ToString();
-                }
-            }
-            catch { }
+{
+    try
+    {
+        var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+        
+        // Gather all IPv4 addresses on the machine
+        var ipv4Addresses = host.AddressList
+            .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            .Select(ip => ip.ToString())
+            .ToList();
 
-            var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-            foreach (var ip in host.AddressList)
-            {
-                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                {
-                    string ipStr = ip.ToString();
-                    if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || ipStr.StartsWith("172.")) return ipStr;
-                }
-            }
+        // 1. Prioritize standard local home networks (192.168.x.x)
+        var preferredIp = ipv4Addresses.FirstOrDefault(ip => ip.StartsWith("192.168."));
+        if (preferredIp != null) return preferredIp;
 
-            return "127.0.0.1";
-        }
+        // 2. Fallback to 172.16-31.x.x networks
+        preferredIp = ipv4Addresses.FirstOrDefault(ip => ip.StartsWith("172."));
+        if (preferredIp != null) return preferredIp;
+
+        // 3. Fallback to 10.x.x.x networks (VPNs usually use this, so it is checked last)
+        preferredIp = ipv4Addresses.FirstOrDefault(ip => ip.StartsWith("10."));
+        if (preferredIp != null) return preferredIp;
+    }
+    catch 
+    { 
+        // Ignore errors and fall back to localhost
+    }
+
+    // 4. Ultimate fallback if offline
+    return "127.0.0.1";
+}
     }
 }
