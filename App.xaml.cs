@@ -24,37 +24,32 @@ namespace PlutoForChannels
         public static int StreamCounter = 0;
 
         private async void Application_Startup(object sender, StartupEventArgs e)
-{
-    AppWindow = new MainWindow();
-
-    LogToConsole("Initializing ASP.NET Core Web Host...");
-
-    int targetPort = 7777;
-    var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
-    AppSettings? appSettings = null;
-
-    // 1. Read Settings
-    if (File.Exists(settingsPath))
-    {
-        try
         {
-            appSettings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(settingsPath));
-            if (appSettings != null && appSettings.Port > 0)
+            AppWindow = new MainWindow();
+            AppWindow.Show();
+
+            LogToConsole("Initializing ASP.NET Core Web Host...");
+
+            int targetPort = 7777;
+            var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            AppSettings? appSettings = null;
+
+            // 1. Read Target Port from settings.json
+            if (File.Exists(settingsPath))
             {
-                targetPort = appSettings.Port;
+                try
+                {
+                    appSettings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(settingsPath));
+                    if (appSettings != null && appSettings.Port > 0)
+                    {
+                        targetPort = appSettings.Port;
+                    }
+                }
+                catch { }
             }
-        }
-        catch { }
-    }
 
-    // 2. Decide whether to show the Dashboard window based on the saved setting
-    if (appSettings == null || !appSettings.StartHidden)
-    {
-        AppWindow.Show();
-    }
-
-    // 3. Allow Environment Variable to override
-    if (int.TryParse(Environment.GetEnvironmentVariable("PLUTO_PORT"), out int envPort))
+            // 2. Allow Environment Variable to override
+            if (int.TryParse(Environment.GetEnvironmentVariable("PLUTO_PORT"), out int envPort))
             {
                 targetPort = envPort;
             }
@@ -92,7 +87,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.1.6"; // Matches your Windows Desktop UI version
+                var version = "1.1.5"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
