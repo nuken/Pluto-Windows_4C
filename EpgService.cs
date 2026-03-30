@@ -178,18 +178,19 @@ namespace PlutoForChannels
         int number = episode?["number"]?.GetValue<int>() ?? 0;
 
         if (progType == "live")
-        {
-            // Trust Pluto's "live" flag regardless of the release date
-            programme.Add(new XElement("live"));
-			programme.Add(new XElement("new"));
-            
-            // Suppress meaningless "Season 1, Episode 0" for live news broadcasts
-            if (season > 0 && number > 0)
-            {
-                programme.Add(new XElement("episode-num", 
-                    new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
-            }
-        }
+{
+    // Trust Pluto's "live" flag regardless of the release date
+    programme.Add(new XElement("live"));
+    programme.Add(new XElement("new"));
+    
+    // Suppress meaningless "Season 1, Episode 0" AND "Season 1, Episode 1" for live news broadcasts
+    // This removes the S01E01 tag, preventing Channels DVR from flagging it as a Series Premiere
+    if (season > 0 && number > 0 && !(season == 1 && number <= 1))
+    {
+        programme.Add(new XElement("episode-num", 
+            new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
+    }
+}
         else if (progType != "film" && (season > 0 || number > 0))
         {
             programme.Add(new XElement("episode-num", 
