@@ -26,6 +26,21 @@ A native Windows bridge for integrating Pluto TV channels into Channels DVR. It 
 5. **XMLTV URL**: Copy the EPG link from the dashboard (e.g., `http://localhost:7777/pluto/epg/all/epg-all.xml`).
 6. Set the format to MPEG-TS and **Refresh Interval** to "6 hours."
 
+## How to Update
+
+When a new version is released follow these steps to upgrade:
+
+1. **Check for Updates:** Open the dashboard by right-clicking the system tray icon and selecting **Show Dashboard**. Click the **Check for Updates** button. 
+2. **Download the New Release:** If an update is available, click **Yes** on the prompt. This will open your default web browser to the latest GitHub release page. Download the new `PlutoForChannels.exe` file.
+3. **Shutdown the Current Server:** Close the dashboard window. Then, right-click the system tray icon again and select **Quit Server** to completely stop the background process.
+4. **Replace the Executable:** Locate your newly downloaded `PlutoForChannels.exe` and move it into your existing application folder, replacing the old file.
+5. **Relaunch:** Double-click the updated `PlutoForChannels.exe` to start the server again. The dashboard should now display the new version number in the top right.
+6. **Refresh Guide Data (Channels DVR):** To immediately apply the new EPG fixes to your guide, force an XMLTV update:
+   * Go to your Channels DVR Web Admin page.
+   * Navigate to **Settings** > **Sources**.
+   * Locate your Pluto Custom Channel, click the **Manage** dropdown menu, and select **Redownload XMLTV**. 
+   * Once the download finishes, your guide data will be updated.
+
 ## Build from Source
 
 If you want to build the executable yourself using the .NET 10 SDK:
