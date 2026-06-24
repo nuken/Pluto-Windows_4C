@@ -78,15 +78,6 @@ namespace PlutoForChannels
                     {
                         using StreamReader reader = new StreamReader(stream);
                         string html = await reader.ReadToEndAsync();
-                        
-                        html = html.Replace(
-                            "await fetch('/api/settings', {", 
-                            "const response = await fetch('/api/settings', {");
-                        
-                        html = html.Replace(
-                            "body: JSON.stringify(newSettings)\n            });", 
-                            "body: JSON.stringify(newSettings)\n            });\n            if (!response.ok) throw new Error('Server returned ' + response.status);");
-
                         context.Response.ContentType = "text/html";
                         await context.Response.WriteAsync(html);
                         return;
@@ -98,6 +89,7 @@ namespace PlutoForChannels
             app.MapGet("/api/settings", () =>
             {
                 var settingsPath = Path.Combine(AppDir, "settings.json");
+                // Default to just 'local' now
                 AppSettings settings = new AppSettings { SelectedRegions = new List<string> { "local" } };
                 
                 if (File.Exists(settingsPath))
@@ -309,58 +301,39 @@ WantedBy=multi-user.target
                 Console.WriteLine("Enabling and starting service...");
                 Process.Start("systemctl", $"enable --now {serviceName}")?.WaitForExit();
 
-                // --- NEW SHORTCUT GENERATION LOGIC ---
-                string iconPath = Path.Combine(AppDir, "icon.ico");
-                try
-                {
-                    var assembly = typeof(Program).Assembly;
-                    var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("icon.ico"));
-                    if (resourceName != null)
-                    {
-                        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
-                        if (stream != null)
-                        {
-                            using FileStream fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write);
-                            stream.CopyTo(fileStream);
-                        }
-                    }
-                }
-                catch { }
-
-                string targetUrl = $"http://{serverIp}:{activePort}";
-                string desktopFilePath = Path.Combine(AppDir, "Pluto Dashboard.desktop");
-                
-                string desktopShortcut = $@"
-[Desktop Entry]
-Version=1.0
-Name=Pluto Dashboard
-Comment=Manage PlutoForChannels Proxy
-Exec=xdg-open {targetUrl}
-Icon={iconPath}
-Terminal=false
-Type=Application
-Categories=Network;
-";
-                File.WriteAllText(desktopFilePath, desktopShortcut.Trim());
-
-                // Attempt to mark the shortcut as executable
-                try 
-                { 
-                    Process.Start("chmod", $"+x \"{desktopFilePath}\"")?.WaitForExit(); 
-                } 
-                catch { }
-                // -------------------------------------
-
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("\n==================================================");
                 Console.WriteLine(" INSTALLATION SUCCESSFUL! ");
                 Console.WriteLine("==================================================");
                 Console.WriteLine($"\nNetwork IP Discovered : {serverIp}");
                 Console.WriteLine($"Service Port Assigned : {activePort}");
-                Console.WriteLine($"\nA clickable shortcut 'Pluto Dashboard.desktop' has been created in this folder.");
-                Console.WriteLine("Double-click it to open the management interface in your browser.");
+                Console.WriteLine($"\nManage your server by visiting:");
+                Console.WriteLine($"---> http://{serverIp}:{activePort} <---");
                 Console.WriteLine("\n==================================================\n");
                 Console.ResetColor();
+                
+                string targetUrl = $"http://{serverIp}:{activePort}";
+                string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+
+                if (!string.IsNullOrEmpty(sudoUser))
+                {
+                    // Pass the command back to the standard user account to prevent sandbox violations
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "sudo", 
+                        Arguments = $"-u {sudoUser} xdg-open {targetUrl}", 
+                        UseShellExecute = false 
+                    });
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "xdg-open", 
+                        Arguments = targetUrl, 
+                        UseShellExecute = false 
+                    });
+                }
             }
             catch (UnauthorizedAccessException)
             {
@@ -370,7 +343,7 @@ Categories=Network;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WARNING] Setup encountered an issue: {ex.Message}");
+                Console.WriteLine($"[WARNING] Could not launch browser automatically: {ex.Message}");
             }
         }
     }
