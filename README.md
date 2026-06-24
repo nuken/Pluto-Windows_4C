@@ -1,55 +1,46 @@
-# PlutoForChannels-Windows
+# Pluto for Channels (Linux Proxy)
 
-A native Windows bridge for integrating Pluto TV channels into Channels DVR. It should work with other media players too. This application replaces the need for Docker by providing a standalone `.exe` that runs in your system tray, manages M3U playlists, and automatically updates EPG data. Username and Password fields have been added to the dashboard to work with the latest changes to the Pluto API. 
+A lightweight, headless Linux daemon that bridges Pluto TV and Channels DVR. 
+
+This application acts as a local proxy, generating dynamic M3U playlists and EPG (Electronic Program Guide) XML data to seamlessly integrate Pluto TV into your Channels DVR setup. It is built as a highly optimized, single-file executable specifically designed for Linux environments.
 
 ## Features
+* **Self-Contained:** No messy dependencies or external web servers required.
+* **Web Dashboard:** Manage your Pluto credentials and active regions via a built-in, responsive web interface.
+* **Auto-Installer:** Automatically configures itself as a systemd background service and binds to your true LAN IP.
+* **Desktop Integration:** Extracts an icon and creates a clickable desktop shortcut for easy dashboard access on Ubuntu/GNOME desktop environments.
 
-* **Native Windows App**: No Docker or WSL required.
-* **System Tray Integration**: Runs silently in the background with a "Minimize to Tray" feature.
-* **Region Selection**: Choose specifically which Pluto TV regions (US, CA, UK, etc.) you want to pull feeds from.
-* **Automated EPG**: Background scheduler automatically generates and refreshes XMLTV files every 2 hours.
-* **Dynamic Links**: Dashboard provides copyable links for M3U and EPG feeds based on your selected regions.
-* **Settings Persistence**: Remembers your selected regions between restarts via a local configuration file.
+---
 
 ## Installation
 
-1. Download the latest `PlutoForChannels.exe` from the **Releases** section.
-2. Move the `.exe` to a folder of your choice (e.g., `C:\PlutoForChannels`).
-3. Run the application. Windows may show a "SmartScreen" warning; click "More Info" and "Run Anyway."
+Download the compiled PlutoForChannels Linux binary to your machine. 
 
-## Setup in Channels DVR
+### Option A: Install as a Background Service (Recommended)
+This is the best approach for a dedicated media server. It will run silently in the background and start automatically when your computer boots.
 
-1. Open the PlutoForChannels dashboard from your system tray.
-2. Select the regions you wish to use (e.g., "us_east", "ca").
-3. In your **Channels DVR Web Admin**, go to **Settings** > **Sources** > **Add Source** > **Custom Channels**.
-4. **M3U URL**: Copy the M3U link from the PlutoForChannels dashboard (e.g., `http://localhost:7777/pluto/all/playlist.m3u`).
-5. **XMLTV URL**: Copy the EPG link from the dashboard (e.g., `http://localhost:7777/pluto/epg/all/epg-all.xml`).
-6. Set the format to MPEG-TS and **Refresh Interval** to "6 hours."
+1. Open your terminal and navigate to the folder containing the downloaded file.
+2. Make the file executable:
+   chmod +x PlutoForChannels
+3. Run the automated installer with root privileges:
+   sudo ./PlutoForChannels --install
+4. The terminal will output the LAN IP address and Port assigned to your dashboard (e.g., http://192.168.1.50:7777). Open this address in your web browser, select your regions, and click **Save Global Settings** to generate your M3U and EPG links.
 
-## How to Update
+### Option B: Run Interactively (Desktop Mode)
+If you are using a Linux Desktop environment (like Ubuntu) and just want to test the app without installing a permanent service:
+* Simply double-click the PlutoForChannels executable. It will start the server and automatically pop open your default web browser to the dashboard. *(Note: The proxy will stop running if you close your terminal or log out).*
 
-When a new version is released follow these steps to upgrade:
+---
 
-1. **Check for Updates:** Open the dashboard by right-clicking the system tray icon and selecting **Show Dashboard**. Click the **Check for Updates** button. 
-2. **Download the New Release:** If an update is available, click **Yes** on the prompt. This will open your default web browser to the latest GitHub release page. Download the new `PlutoForChannels.exe` file.
-3. **Shutdown the Current Server:** Close the dashboard window. Then, right-click the system tray icon again and select **Quit Server** to completely stop the background process.
-4. **Replace the Executable:** Locate your newly downloaded `PlutoForChannels.exe` and move it into your existing application folder, replacing the old file.
-5. **Relaunch:** Double-click the updated `PlutoForChannels.exe` to start the server again. The dashboard should now display the new version number in the top right.
-6. **Refresh Guide Data (Channels DVR):** To immediately apply the new EPG fixes to your guide, force an XMLTV update:
-   * Go to your Channels DVR Web Admin page.
-   * Navigate to **Settings** > **Sources**.
-   * Locate your Pluto Custom Channel, click the **Manage** dropdown menu, and select **Redownload XMLTV**. 
-   * Once the download finishes, your guide data will be updated.
+## Managing the Service
 
-## Build from Source
+If you installed the application as a background service (Option A), you can manage it using standard systemd commands:
 
-If you want to build the executable yourself using the .NET 10 SDK:
+**Check if the service is running:**
+sudo systemctl status plutoforchannels
 
-```bash
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:ApplicationIcon=icon.ico
+**Restart the service:**
+sudo systemctl restart plutoforchannels
 
-```
-
-## How it Works
-
-This application acts as a middleware bridge. It fetches channel metadata from Pluto TV's API and translates it into the M3U and XMLTV formats that Channels DVR expects. When you play a channel, the app provides a redirect to the official Pluto TV stream with the necessary session tokens and device parameters.
+**Stop the service:**
+sudo systemctl stop plutoforchannels
