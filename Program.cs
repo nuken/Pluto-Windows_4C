@@ -66,19 +66,27 @@ namespace PlutoForChannels
 
             var app = builder.Build();
 
-            // --- WEB DASHBOARD ROUTES ---
+            // Serve the Frontend UI from Embedded Resources
             app.MapGet("/", async (HttpContext context) =>
             {
-                string indexPath = Path.Combine(AppContext.BaseDirectory, "index.html");
-                if (File.Exists(indexPath))
+                var assembly = typeof(Program).Assembly;
+                // Find the embedded resource path (usually it looks like "PlutoForChannels.index.html")
+                var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("index.html"));
+                
+                if (resourceName != null)
                 {
-                    context.Response.ContentType = "text/html";
-                    await context.Response.SendFileAsync(indexPath);
+                    using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+                    if (stream != null)
+                    {
+                        using StreamReader reader = new StreamReader(stream);
+                        string html = await reader.ReadToEndAsync();
+                        context.Response.ContentType = "text/html";
+                        await context.Response.WriteAsync(html);
+                        return;
+                    }
                 }
-                else
-                {
-                    await context.Response.WriteAsync("Error: index.html not found.");
-                }
+                
+                await context.Response.WriteAsync("Error: index.html was not embedded in the executable.");
             });
 
             // API: Read Settings (Now passes the true Server IP and Port to the frontend)
