@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluto for Channels</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-bg: #252525;
+            --text-main: #f5f5f5;
+            --text-muted: #aaaaaa;
+            --accent: #3273dc;
+            --accent-hover: #4e8ff1;
+            --success: #48c774;
+            --border: #363636;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+        }
+        h1, h2 { margin-top: 0; color: #fff; font-weight: 600; }
+        .tag {
+            background-color: var(--accent);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.5em;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+        .panel {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9em; }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: white;
+            font-size: 1.1em;
+        }
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        .link-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .link-row:last-child { border-bottom: none; }
+        .link-url {
+            color: var(--accent);
+            font-family: Consolas, monospace;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .copy-btn { width: auto; padding: 8px 15px; font-size: 0.9em; }
+        .hidden { display: none; }
+        #toast {
+            position: fixed; top: 20px; right: 20px;
+            background-color: var(--success); color: white;
+            padding: 15px 25px; border-radius: 4px;
+            transform: translateY(-100px); transition: transform 0.3s;
+            font-weight: bold; z-index: 1000;
+        }
+        #toast.show { transform: translateY(0); }
+        
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="toast">Settings Saved & Cache Cleared!</div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="panel">
+                <h2>Active Regions</h2>
+                <div class="checkbox-group" id="regionsList">
+                    </div>
+            </div>
+
+            <div class="panel">
+                <h2>Authentication</h2>
+                
+                <label>Account 1 (Required)</label>
+                <input type="text" id="Username" placeholder="Email">
+                <input type="password" id="Password" placeholder="Password">
+
+                <label>Account 2 (Optional)</label>
+                <input type="text" id="Username2" placeholder="Email">
+                <input type="password" id="Password2" placeholder="Password">
+
+                <div id="extraAccounts" class="hidden">
+                    <label>Account 3 (Optional)</label>
+                    <input type="text" id="Username3" placeholder="Email">
+                    <input type="password" id="Password3" placeholder="Password">
+
+                    <label>Account 4 (Optional)</label>
+                    <input type="text" id="Username4" placeholder="Email">
+                    <input type="password" id="Password4" placeholder="Password">
+                </div>
+
+                <label class="checkbox-label" style="font-size: 0.9em; margin-bottom: 15px;">
+                    <input type="checkbox" id="toggleExtra" onchange="toggleExtraAccounts()"> Show Additional Accounts
+                </label>
+
+                <button onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1>Pluto for Channels <span class="tag">Linux Proxy</span></h1>
+            </div>
+
+            <div class="panel">
+                <h2 style="margin-bottom: 5px;">Dynamic Feed Links</h2>
+                <p style="color: var(--text-muted); margin-top: 0; margin-bottom: 20px;">Add these URLs to Channels DVR as Custom Channels.</p>
+                <div id="linksContainer">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const availableRegions = ["all", "local", "us_east", "us_west", "ca", "uk", "fr", "de"];
+    let currentSettings = {};
+    let trueServerIp = "";
+    let activePort = 7777;
+
+    async function loadSettings() {
+        try {
+            const response = await fetch('/api/settings');
+            const data = await response.json();
+            
+            currentSettings = data.settings;
+            trueServerIp = data.serverIp;
+            activePort = data.activePort;
+            
+            // Populate Auth Fields
+            document.getElementById('Username').value = currentSettings.username || "";
+            document.getElementById('Password').value = currentSettings.password || "";
+            document.getElementById('Username2').value = currentSettings.username2 || "";
+            document.getElementById('Password2').value = currentSettings.password2 || "";
+            document.getElementById('Username3').value = currentSettings.username3 || "";
+            document.getElementById('Password3').value = currentSettings.password3 || "";
+            document.getElementById('Username4').value = currentSettings.username4 || "";
+            document.getElementById('Password4').value = currentSettings.password4 || "";
+
+            if (currentSettings.username3 || currentSettings.username4) {
+                document.getElementById('toggleExtra').checked = true;
+                toggleExtraAccounts();
+            }
+
+            // Populate Regions
+            const regionsDiv = document.getElementById('regionsList');
+            regionsDiv.innerHTML = '';
+            
+            availableRegions.forEach(region => {
+                const isChecked = currentSettings.selectedRegions && currentSettings.selectedRegions.includes(region);
+                const label = document.createElement('label');
+                label.className = 'checkbox-label';
+                label.innerHTML = `<input type="checkbox" value="${region}" ${isChecked ? 'checked' : ''} onchange="generateLinks()"> ${region}`;
+                regionsDiv.appendChild(label);
+            });
+
+            generateLinks();
+        } catch (err) {
+            console.error("Failed to load settings", err);
+        }
+    }
+
+    async function saveSettings() {
+        const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
+        
+        const newSettings = {
+            port: activePort, // Preserve the port assigned by the server
+            startHidden: true, 
+            selectedRegions: selected,
+            username: document.getElementById('Username').value.trim(),
+            password: document.getElementById('Password').value,
+            username2: document.getElementById('Username2').value.trim(),
+            password2: document.getElementById('Password2').value,
+            username3: document.getElementById('Username3').value.trim(),
+            password3: document.getElementById('Password3').value,
+            username4: document.getElementById('Username4').value.trim(),
+            password4: document.getElementById('Password4').value
+        };
+
+        try {
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSettings)
+            });
+            
+            currentSettings = newSettings;
+            generateLinks();
+            showToast();
+        } catch (err) {
+            alert("Failed to save settings. Check console for details.");
+        }
+    }
+
+    function generateLinks() {
+        const container = document.getElementById('linksContainer');
+        container.innerHTML = '';
+        
+        const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
+        
+        // Force the use of the backend's verified LAN IP and Port instead of window.location
+        const host = `${trueServerIp}:${activePort}`; 
+
+        if (selected.length === 0) {
+            container.innerHTML = '<p style="color: #ff6b6b;">No regions selected.</p>';
+            return;
+        }
+
+        selected.forEach(region => {
+            const m3uUrl = `http://${host}/pluto/${region}/playlist.m3u`;
+            const epgUrl = `http://${host}/pluto/epg/${region}/epg-${region}.xml`;
+
+            container.innerHTML += `
+                <div class="link-row">
+                    <div>
+                        <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} M3U</div>
+                        <a href="${m3uUrl}" target="_blank" class="link-url">${m3uUrl}</a>
+                    </div>
+                    <button class="copy-btn" onclick="copyText('${m3uUrl}', this)">Copy</button>
+                </div>
+                <div class="link-row">
+                    <div>
+                        <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} EPG</div>
+                        <a href="${epgUrl}" target="_blank" class="link-url">${epgUrl}</a>
+                    </div>
+                    <button class="copy-btn" onclick="copyText('${epgUrl}', this)">Copy</button>
+                </div>
+            `;
+        });
+    }
+
+    function toggleExtraAccounts() {
+        const extra = document.getElementById('extraAccounts');
+        const toggle = document.getElementById('toggleExtra');
+        extra.className = toggle.checked ? '' : 'hidden';
+    }
+
+    function copyText(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerText;
+            btn.innerText = "Copied!";
+            btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => {
+                btn.innerText = orig;
+                btn.style.backgroundColor = "var(--accent)";
+            }, 2000);
+        });
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    loadSettings();
+</script>
+</body>
+</html>

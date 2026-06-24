@@ -17,7 +17,7 @@ namespace PlutoForChannels
     {
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _memoryCache;
-        
+
         private CancellationTokenSource _cacheEvictionTokenSource = new CancellationTokenSource();
 
         private readonly Dictionary<string, string> _xForward = new()
@@ -30,11 +30,9 @@ namespace PlutoForChannels
             { "us_east", "108.82.206.181" },
             { "us_west", "76.81.9.69" }
         };
-        
-        // Create a pool of 10 virtual devices (unique clientIDs) to bypass stream limits
+
         private readonly string[] _devicePool = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid().ToString()).ToArray();
 
-        // Inject IMemoryCache alongside HttpClient
         public PlutoClient(HttpClient httpClient, IMemoryCache memoryCache)
         {
             _httpClient = httpClient;
@@ -43,12 +41,11 @@ namespace PlutoForChannels
 
         public void ClearCache()
         {
-            // Cancel the token to instantly invalidate all cached items
             _cacheEvictionTokenSource.Cancel();
             _cacheEvictionTokenSource.Dispose();
             _cacheEvictionTokenSource = new CancellationTokenSource();
         }
-        
+
         public string GetDeviceId(int streamIndex)
         {
             return _devicePool[streamIndex % _devicePool.Length];
@@ -65,7 +62,7 @@ namespace PlutoForChannels
                     var json = System.IO.File.ReadAllText(settingsPath);
                     using var doc = System.Text.Json.JsonDocument.Parse(json);
                     var root = doc.RootElement;
-                    
+
                     string u1 = root.TryGetProperty("Username", out var ue) ? ue.GetString() ?? "" : "";
                     string p1 = root.TryGetProperty("Password", out var pe) ? pe.GetString() ?? "" : "";
                     if (!string.IsNullOrEmpty(u1) && !string.IsNullOrEmpty(p1)) accounts.Add((u1, p1));
@@ -84,36 +81,28 @@ namespace PlutoForChannels
                 }
                 catch { }
             }
-            if (accounts.Count == 0) accounts.Add(("", "")); // Fallback
+            if (accounts.Count == 0) accounts.Add(("", ""));
             return accounts;
         }
 
         public async Task<JsonNode?> GetBootDataAsync(string countryCode, int accountIndex = 0, int streamIndex = 0)
         {
-            // Lock the stream index to our pool of 10 virtual devices
             int deviceIndex = streamIndex % _devicePool.Length;
-            
-            // Cache tokens uniquely per country, account, AND virtual device!
             string cacheKey = $"{countryCode}_{accountIndex}_{deviceIndex}";
 
-            // GetOrCreateAsync atomically checks the cache and blocks other threads from
-            // making duplicate API requests if a fetch is already in progress.
             return await _memoryCache.GetOrCreateAsync(cacheKey, async cacheEntry =>
             {
-                // Tokens expire gracefully after 4 hours and are garbage collected
                 cacheEntry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4);
-                
-                // Link the cache entry to our master eviction token so we can wipe it on demand
                 cacheEntry.AddExpirationToken(new CancellationChangeToken(_cacheEvictionTokenSource.Token));
 
                 var query = HttpUtility.ParseQueryString(string.Empty);
                 query["appName"] = "web";
-                query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6"; 
-                query["deviceVersion"] = "142.0.0"; 
+                query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6";
+                query["deviceVersion"] = "142.0.0";
                 query["deviceModel"] = "web";
                 query["deviceMake"] = "chrome";
                 query["deviceType"] = "web";
-                query["clientID"] = _devicePool[deviceIndex]; // Kept dynamic to preserve stream limits fix
+                query["clientID"] = _devicePool[deviceIndex];
                 query["clientModelNumber"] = "1.0.0";
                 query["serverSideAds"] = "false";
                 query["drmCapabilities"] = "widevine:L3";
@@ -124,7 +113,7 @@ namespace PlutoForChannels
 
                 var accounts = GetValidAccounts();
                 var (username, password) = accounts[accountIndex % accounts.Count];
-                
+
                 if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
                 {
                     query["username"] = username;
@@ -133,8 +122,7 @@ namespace PlutoForChannels
 
                 var requestUri = $"https://boot.pluto.tv/v4/start?{query}";
                 var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-                
-                // Updated Request Headers for a Windows 11 client profile
+
                 request.Headers.Add("authority", "boot.pluto.tv");
                 request.Headers.Add("accept", "*/*");
                 request.Headers.Add("accept-language", "en-US,en;q=0.9");
@@ -156,32 +144,31 @@ namespace PlutoForChannels
                 try
                 {
                     var response = await _httpClient.SendAsync(request);
-                    
+
                     if (!response.IsSuccessStatusCode)
                     {
-                        App.LogToConsole($"[ERROR] HTTP failure {response.StatusCode} for {countryCode} (Account {accountIndex % accounts.Count + 1})");
+                        Console.WriteLine($"[ERROR] HTTP failure {response.StatusCode} for {countryCode} (Account {accountIndex % accounts.Count + 1})");
                         return null;
                     }
 
                     var jsonResponse = await response.Content.ReadFromJsonAsync<JsonNode>();
-                    
+
                     if (jsonResponse != null)
                     {
-                        App.LogToConsole($"New token for {countryCode} (Account {accountIndex % accounts.Count + 1}) generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        Console.WriteLine($"New token for {countryCode} (Account {accountIndex % accounts.Count + 1}) generated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                         return jsonResponse;
                     }
                 }
                 catch (Exception ex)
                 {
-                    App.LogToConsole($"[ERROR] Exception fetching boot data: {ex.Message}");
+                    Console.WriteLine($"[ERROR] Exception fetching boot data: {ex.Message}");
                 }
 
-                // If it fails, expire immediately so the next request tries again
                 cacheEntry.AbsoluteExpirationRelativeToNow = TimeSpan.Zero;
                 return null;
             });
         }
-        
+
         public async Task<JsonNode?> GetTimelinesAsync(string countryCode, string channelIds, string startTime)
         {
             var bootData = await GetBootDataAsync(countryCode, 0);
@@ -212,7 +199,7 @@ namespace PlutoForChannels
             }
             catch (Exception ex)
             {
-                App.LogToConsole($"[ERROR] Fetching timelines: {ex.Message}");
+                Console.WriteLine($"[ERROR] Fetching timelines: {ex.Message}");
             }
 
             return null;
@@ -230,7 +217,7 @@ namespace PlutoForChannels
 
             if (string.IsNullOrEmpty(token))
             {
-                App.LogToConsole($"[ERROR] Failed to retrieve session token for {countryCode}.");
+                Console.WriteLine($"[ERROR] Failed to retrieve session token for {countryCode}.");
                 return new List<Channel>();
             }
 
@@ -259,7 +246,7 @@ namespace PlutoForChannels
                 foreach (var header in headers) categoriesRequest.Headers.Add(header.Key, header.Value);
                 var categoriesResponse = await _httpClient.SendAsync(categoriesRequest);
                 var categoriesJson = await categoriesResponse.Content.ReadFromJsonAsync<JsonNode>();
-                
+
                 var categoryMap = new Dictionary<string, string>();
                 if (categoriesJson?["data"] is JsonArray categoriesArray)
                 {
@@ -313,7 +300,7 @@ namespace PlutoForChannels
             }
             catch (Exception ex)
             {
-                App.LogToConsole($"[ERROR] Exception fetching channels for {countryCode}: {ex.Message}");
+                Console.WriteLine($"[ERROR] Exception fetching channels for {countryCode}: {ex.Message}");
                 return new List<Channel>();
             }
         }
@@ -339,7 +326,7 @@ namespace PlutoForChannels
             foreach (var channel in uniqueChannels)
             {
                 int number = channel.Number;
-                
+
                 int offset = channel.CountryCode?.ToLower() switch
                 {
                     "ca" => 6000,
