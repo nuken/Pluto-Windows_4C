@@ -301,39 +301,75 @@ WantedBy=multi-user.target
                 Console.WriteLine("Enabling and starting service...");
                 Process.Start("systemctl", $"enable --now {serviceName}")?.WaitForExit();
 
+                // --- SHORTCUT CREATION & OWNERSHIP FIX ---
+                string iconPath = Path.Combine(AppDir, "icon.ico");
+                string desktopFilePath = Path.Combine(AppDir, "Pluto Dashboard.desktop");
+                string targetUrl = $"http://{serverIp}:{activePort}";
+
+                try
+                {
+                    // Extract the icon from embedded resources
+                    var assembly = typeof(Program).Assembly;
+                    var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("icon.ico"));
+                    if (resourceName != null)
+                    {
+                        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+                        if (stream != null)
+                        {
+                            using FileStream fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write);
+                            stream.CopyTo(fileStream);
+                        }
+                    }
+
+                    // Create the .desktop shortcut
+                    string desktopShortcut = $@"
+[Desktop Entry]
+Version=1.0
+Name=Pluto Dashboard
+Comment=Manage PlutoForChannels Proxy
+Exec=xdg-open {targetUrl}
+Icon={iconPath}
+Terminal=false
+Type=Application
+Categories=Network;
+";
+                    File.WriteAllText(desktopFilePath, desktopShortcut.Trim());
+
+                    // Fix ownership so the regular user can double-click it without permission errors
+                    string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+                    if (!string.IsNullOrEmpty(sudoUser))
+                    {
+                        Process.Start(new ProcessStartInfo 
+                        { 
+                            FileName = "chown", 
+                            Arguments = $"{sudoUser}:{sudoUser} \"{desktopFilePath}\" \"{iconPath}\"", 
+                            UseShellExecute = false 
+                        })?.WaitForExit();
+                    }
+
+                    // Make the shortcut executable
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "chmod", 
+                        Arguments = $"+x \"{desktopFilePath}\"", 
+                        UseShellExecute = false 
+                    })?.WaitForExit();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WARNING] Failed to create desktop shortcut: {ex.Message}");
+                }
+
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("\n==================================================");
                 Console.WriteLine(" INSTALLATION SUCCESSFUL! ");
                 Console.WriteLine("==================================================");
                 Console.WriteLine($"\nNetwork IP Discovered : {serverIp}");
                 Console.WriteLine($"Service Port Assigned : {activePort}");
-                Console.WriteLine($"\nManage your server by visiting:");
-                Console.WriteLine($"---> http://{serverIp}:{activePort} <---");
+                Console.WriteLine($"\nA clickable shortcut 'Pluto Dashboard' with your icon");
+                Console.WriteLine($"has been created in {AppDir}");
                 Console.WriteLine("\n==================================================\n");
                 Console.ResetColor();
-                
-                string targetUrl = $"http://{serverIp}:{activePort}";
-                string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
-
-                if (!string.IsNullOrEmpty(sudoUser))
-                {
-                    // Pass the command back to the standard user account to prevent sandbox violations
-                    Process.Start(new ProcessStartInfo 
-                    { 
-                        FileName = "sudo", 
-                        Arguments = $"-u {sudoUser} xdg-open {targetUrl}", 
-                        UseShellExecute = false 
-                    });
-                }
-                else
-                {
-                    Process.Start(new ProcessStartInfo 
-                    { 
-                        FileName = "xdg-open", 
-                        Arguments = targetUrl, 
-                        UseShellExecute = false 
-                    });
-                }
             }
             catch (UnauthorizedAccessException)
             {
@@ -343,7 +379,7 @@ WantedBy=multi-user.target
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WARNING] Could not launch browser automatically: {ex.Message}");
+                Console.WriteLine($"[ERROR] Setup encountered an issue: {ex.Message}");
             }
         }
     }
