@@ -46,6 +46,7 @@ namespace PlutoForChannels
                 SaveConfiguredPort(activePort);
             }
 
+            // --- SYSTEMD INSTALLER MODE (Requires Terminal 'sudo') ---
             if (args.Contains("--install"))
             {
                 InstallSystemdService(serverIp, activePort);
@@ -78,6 +79,15 @@ namespace PlutoForChannels
                     {
                         using StreamReader reader = new StreamReader(stream);
                         string html = await reader.ReadToEndAsync();
+                        
+                        html = html.Replace(
+                            "await fetch('/api/settings', {", 
+                            "const response = await fetch('/api/settings', {");
+                        
+                        html = html.Replace(
+                            "body: JSON.stringify(newSettings)\n            });", 
+                            "body: JSON.stringify(newSettings)\n            });\n            if (!response.ok) throw new Error('Server returned ' + response.status);");
+
                         context.Response.ContentType = "text/html";
                         await context.Response.WriteAsync(html);
                         return;
@@ -89,7 +99,6 @@ namespace PlutoForChannels
             app.MapGet("/api/settings", () =>
             {
                 var settingsPath = Path.Combine(AppDir, "settings.json");
-                // Default to just 'local' now
                 AppSettings settings = new AppSettings { SelectedRegions = new List<string> { "local" } };
                 
                 if (File.Exists(settingsPath))
@@ -180,7 +189,31 @@ namespace PlutoForChannels
                 return Results.File(filePath, contentType: filename.EndsWith(".gz") ? "application/gzip" : "application/xml");
             });
 
-            await app.RunAsync();
+            // Start the application silently in the background first
+            await app.StartAsync();
+
+            // --- INTERACTIVE AUTO-LAUNCH MODE ---
+            // If the application was NOT launched by the systemd background service, open the browser automatically.
+            bool isBackgroundService = Environment.GetEnvironmentVariable("PLUTO_BACKGROUND") == "true";
+            string targetUrl = $"http://{serverIp}:{activePort}";
+
+            if (!isBackgroundService)
+            {
+                Console.WriteLine($"[INFO] Interactive Mode Detected. Opening dashboard at {targetUrl} ...");
+                try
+                {
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "xdg-open", 
+                        Arguments = targetUrl, 
+                        UseShellExecute = false 
+                    });
+                }
+                catch { }
+            }
+
+            // Keep the application running
+            await app.WaitForShutdownAsync();
         }
 
         private static string GetLocalIPAddress()
@@ -290,6 +323,7 @@ Restart=always
 RestartSec=10
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+Environment=PLUTO_BACKGROUND=true
 
 [Install]
 WantedBy=multi-user.target
@@ -301,73 +335,14 @@ WantedBy=multi-user.target
                 Console.WriteLine("Enabling and starting service...");
                 Process.Start("systemctl", $"enable --now {serviceName}")?.WaitForExit();
 
-                // --- SHORTCUT CREATION & OWNERSHIP FIX ---
-                string iconPath = Path.Combine(AppDir, "icon.ico");
-                string desktopFilePath = Path.Combine(AppDir, "Pluto Dashboard.desktop");
-                string targetUrl = $"http://{serverIp}:{activePort}";
-
-                try
-                {
-                    // Extract the icon from embedded resources
-                    var assembly = typeof(Program).Assembly;
-                    var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("icon.ico"));
-                    if (resourceName != null)
-                    {
-                        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
-                        if (stream != null)
-                        {
-                            using FileStream fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write);
-                            stream.CopyTo(fileStream);
-                        }
-                    }
-
-                    // Create the .desktop shortcut
-                    string desktopShortcut = $@"
-[Desktop Entry]
-Version=1.0
-Name=Pluto Dashboard
-Comment=Manage PlutoForChannels Proxy
-Exec=xdg-open {targetUrl}
-Icon={iconPath}
-Terminal=false
-Type=Application
-Categories=Network;
-";
-                    File.WriteAllText(desktopFilePath, desktopShortcut.Trim());
-
-                    // Fix ownership so the regular user can double-click it without permission errors
-                    string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
-                    if (!string.IsNullOrEmpty(sudoUser))
-                    {
-                        Process.Start(new ProcessStartInfo 
-                        { 
-                            FileName = "chown", 
-                            Arguments = $"{sudoUser}:{sudoUser} \"{desktopFilePath}\" \"{iconPath}\"", 
-                            UseShellExecute = false 
-                        })?.WaitForExit();
-                    }
-
-                    // Make the shortcut executable
-                    Process.Start(new ProcessStartInfo 
-                    { 
-                        FileName = "chmod", 
-                        Arguments = $"+x \"{desktopFilePath}\"", 
-                        UseShellExecute = false 
-                    })?.WaitForExit();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[WARNING] Failed to create desktop shortcut: {ex.Message}");
-                }
-
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("\n==================================================");
                 Console.WriteLine(" INSTALLATION SUCCESSFUL! ");
                 Console.WriteLine("==================================================");
                 Console.WriteLine($"\nNetwork IP Discovered : {serverIp}");
                 Console.WriteLine($"Service Port Assigned : {activePort}");
-                Console.WriteLine($"\nA clickable shortcut 'Pluto Dashboard' with your icon");
-                Console.WriteLine($"has been created in {AppDir}");
+                Console.WriteLine($"\nManage your server by visiting:");
+                Console.WriteLine($"---> http://{serverIp}:{activePort} <---");
                 Console.WriteLine("\n==================================================\n");
                 Console.ResetColor();
             }
@@ -376,10 +351,6 @@ Categories=Network;
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("ERROR: You must run the install command with sudo: sudo ./PlutoForChannels --install");
                 Console.ResetColor();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ERROR] Setup encountered an issue: {ex.Message}");
             }
         }
     }
