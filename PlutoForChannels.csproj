@@ -20,8 +20,4 @@
     <EmbeddedResource Include="icon.ico" />
   </ItemGroup>
   
-  <ItemGroup>
-    <EmbeddedResource Include="index.html" />
-  </ItemGroup>
-
 </Project>
