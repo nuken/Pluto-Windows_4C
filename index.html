@@ -13,6 +13,7 @@
             --accent: #3273dc;
             --accent-hover: #4e8ff1;
             --success: #48c774;
+            --danger: #f14668;
             --border: #363636;
         }
         body {
@@ -41,12 +42,40 @@
             vertical-align: middle;
             margin-left: 10px;
         }
+        .status-badge {
+            font-size: 0.9em;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #363636;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+        }
+        .status-online .status-dot {
+            background-color: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+        .status-offline .status-dot {
+            background-color: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+        }
         .panel {
             background-color: var(--panel-bg);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             margin-bottom: 20px;
+        }
+        .action-panel {
+            background-color: #2c2c2c;
+            border: 1px solid var(--accent);
         }
         label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 0.9em; }
         input[type="text"], input[type="password"] {
@@ -77,11 +106,12 @@
             background-color: var(--accent);
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 14px 20px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             width: 100%;
+            font-size: 1.1em;
             transition: background-color 0.2s;
         }
         button:hover { background-color: var(--accent-hover); }
@@ -116,7 +146,7 @@
     </style>
 </head>
 <body>
-    <div id="toast">Settings Saved & Cache Cleared!</div>
+    <div id="toast">Global Settings Saved!</div>
 
     <div class="container">
         <div class="sidebar">
@@ -147,17 +177,24 @@
                     <input type="password" id="Password4" placeholder="Password">
                 </div>
 
-                <label class="checkbox-label" style="font-size: 0.9em; margin-bottom: 15px;">
+                <label class="checkbox-label" style="font-size: 0.9em; margin-bottom: 5px;">
                     <input type="checkbox" id="toggleExtra" onchange="toggleExtraAccounts()"> Show Additional Accounts
                 </label>
+            </div>
 
-                <button onclick="saveSettings()">Save Settings</button>
+            <div class="panel action-panel">
+                <p style="color: var(--text-muted); font-size: 0.85em; margin-top: 0; text-align: center;">Applies Region & Authentication changes.</p>
+                <button onclick="saveSettings()">Save Global Settings</button>
             </div>
         </div>
 
         <div class="main-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1>Pluto for Channels <span class="tag">Linux Proxy</span></h1>
+                <div id="statusBadge" class="status-badge">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
             </div>
 
             <div class="panel">
@@ -170,147 +207,165 @@
     </div>
 
     <script>
-    const availableRegions = ["all", "local", "us_east", "us_west", "ca", "uk", "fr", "de"];
-    let currentSettings = {};
-    let trueServerIp = "";
-    let activePort = 7777;
+        const availableRegions = ["all", "local", "us_east", "us_west", "ca", "uk", "fr", "de"];
+        let currentSettings = {};
+        let trueServerIp = "";
+        let activePort = 7777;
 
-    async function loadSettings() {
-        try {
-            const response = await fetch('/api/settings');
-            const data = await response.json();
-            
-            currentSettings = data.settings;
-            trueServerIp = data.serverIp;
-            activePort = data.activePort;
-            
-            // Populate Auth Fields
-            document.getElementById('Username').value = currentSettings.username || "";
-            document.getElementById('Password').value = currentSettings.password || "";
-            document.getElementById('Username2').value = currentSettings.username2 || "";
-            document.getElementById('Password2').value = currentSettings.password2 || "";
-            document.getElementById('Username3').value = currentSettings.username3 || "";
-            document.getElementById('Password3').value = currentSettings.password3 || "";
-            document.getElementById('Username4').value = currentSettings.username4 || "";
-            document.getElementById('Password4').value = currentSettings.password4 || "";
+        function updateStatus(isOnline) {
+            const badge = document.getElementById('statusBadge');
+            const text = document.getElementById('statusText');
+            if (isOnline) {
+                badge.className = 'status-badge status-online';
+                text.innerText = 'Status: Running';
+                text.style.color = 'var(--success)';
+            } else {
+                badge.className = 'status-badge status-offline';
+                text.innerText = 'Status: Disconnected';
+                text.style.color = 'var(--danger)';
+            }
+        }
 
-            if (currentSettings.username3 || currentSettings.username4) {
-                document.getElementById('toggleExtra').checked = true;
-                toggleExtraAccounts();
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                if (!response.ok) throw new Error('Server returned ' + response.status);
+                
+                const data = await response.json();
+                updateStatus(true);
+                
+                currentSettings = data.settings;
+                trueServerIp = data.serverIp;
+                activePort = data.activePort;
+                
+                document.getElementById('Username').value = currentSettings.username || "";
+                document.getElementById('Password').value = currentSettings.password || "";
+                document.getElementById('Username2').value = currentSettings.username2 || "";
+                document.getElementById('Password2').value = currentSettings.password2 || "";
+                document.getElementById('Username3').value = currentSettings.username3 || "";
+                document.getElementById('Password3').value = currentSettings.password3 || "";
+                document.getElementById('Username4').value = currentSettings.username4 || "";
+                document.getElementById('Password4').value = currentSettings.password4 || "";
+
+                if (currentSettings.username3 || currentSettings.username4) {
+                    document.getElementById('toggleExtra').checked = true;
+                    toggleExtraAccounts();
+                }
+
+                const regionsDiv = document.getElementById('regionsList');
+                regionsDiv.innerHTML = '';
+                
+                availableRegions.forEach(region => {
+                    const isChecked = currentSettings.selectedRegions && currentSettings.selectedRegions.includes(region);
+                    const label = document.createElement('label');
+                    label.className = 'checkbox-label';
+                    label.innerHTML = `<input type="checkbox" value="${region}" ${isChecked ? 'checked' : ''} onchange="generateLinks()"> ${region}`;
+                    regionsDiv.appendChild(label);
+                });
+
+                generateLinks();
+            } catch (err) {
+                console.error("Failed to load settings", err);
+                updateStatus(false);
+            }
+        }
+
+        async function saveSettings() {
+            const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
+            
+            const newSettings = {
+                port: activePort,
+                startHidden: true, 
+                selectedRegions: selected,
+                username: document.getElementById('Username').value.trim(),
+                password: document.getElementById('Password').value,
+                username2: document.getElementById('Username2').value.trim(),
+                password2: document.getElementById('Password2').value,
+                username3: document.getElementById('Username3').value.trim(),
+                password3: document.getElementById('Password3').value,
+                username4: document.getElementById('Username4').value.trim(),
+                password4: document.getElementById('Password4').value
+            };
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newSettings)
+                });
+                
+                if (!response.ok) throw new Error('Server returned ' + response.status);
+                
+                currentSettings = newSettings;
+                generateLinks();
+                showToast();
+                updateStatus(true);
+            } catch (err) {
+                alert("Failed to save settings. Check console for details.");
+                updateStatus(false);
+            }
+        }
+
+        function generateLinks() {
+            const container = document.getElementById('linksContainer');
+            container.innerHTML = '';
+            
+            const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
+            const host = `${trueServerIp}:${activePort}`; 
+
+            if (selected.length === 0) {
+                container.innerHTML = '<p style="color: #ff6b6b; padding: 15px;">No regions selected. Please select at least one.</p>';
+                return;
             }
 
-            // Populate Regions
-            const regionsDiv = document.getElementById('regionsList');
-            regionsDiv.innerHTML = '';
-            
-            availableRegions.forEach(region => {
-                const isChecked = currentSettings.selectedRegions && currentSettings.selectedRegions.includes(region);
-                const label = document.createElement('label');
-                label.className = 'checkbox-label';
-                label.innerHTML = `<input type="checkbox" value="${region}" ${isChecked ? 'checked' : ''} onchange="generateLinks()"> ${region}`;
-                regionsDiv.appendChild(label);
-            });
+            selected.forEach(region => {
+                const m3uUrl = `http://${host}/pluto/${region}/playlist.m3u`;
+                const epgUrl = `http://${host}/pluto/epg/${region}/epg-${region}.xml`;
 
-            generateLinks();
-        } catch (err) {
-            console.error("Failed to load settings", err);
-        }
-    }
-
-    async function saveSettings() {
-        const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
-        
-        const newSettings = {
-            port: activePort, // Preserve the port assigned by the server
-            startHidden: true, 
-            selectedRegions: selected,
-            username: document.getElementById('Username').value.trim(),
-            password: document.getElementById('Password').value,
-            username2: document.getElementById('Username2').value.trim(),
-            password2: document.getElementById('Password2').value,
-            username3: document.getElementById('Username3').value.trim(),
-            password3: document.getElementById('Password3').value,
-            username4: document.getElementById('Username4').value.trim(),
-            password4: document.getElementById('Password4').value
-        };
-
-        try {
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newSettings)
-            });
-            
-            currentSettings = newSettings;
-            generateLinks();
-            showToast();
-        } catch (err) {
-            alert("Failed to save settings. Check console for details.");
-        }
-    }
-
-    function generateLinks() {
-        const container = document.getElementById('linksContainer');
-        container.innerHTML = '';
-        
-        const selected = Array.from(document.querySelectorAll('#regionsList input:checked')).map(cb => cb.value);
-        
-        // Force the use of the backend's verified LAN IP and Port instead of window.location
-        const host = `${trueServerIp}:${activePort}`; 
-
-        if (selected.length === 0) {
-            container.innerHTML = '<p style="color: #ff6b6b;">No regions selected.</p>';
-            return;
-        }
-
-        selected.forEach(region => {
-            const m3uUrl = `http://${host}/pluto/${region}/playlist.m3u`;
-            const epgUrl = `http://${host}/pluto/epg/${region}/epg-${region}.xml`;
-
-            container.innerHTML += `
-                <div class="link-row">
-                    <div>
-                        <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} M3U</div>
-                        <a href="${m3uUrl}" target="_blank" class="link-url">${m3uUrl}</a>
+                container.innerHTML += `
+                    <div class="link-row">
+                        <div>
+                            <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} M3U</div>
+                            <a href="${m3uUrl}" target="_blank" class="link-url">${m3uUrl}</a>
+                        </div>
+                        <button class="copy-btn" onclick="copyText('${m3uUrl}', this)">Copy</button>
                     </div>
-                    <button class="copy-btn" onclick="copyText('${m3uUrl}', this)">Copy</button>
-                </div>
-                <div class="link-row">
-                    <div>
-                        <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} EPG</div>
-                        <a href="${epgUrl}" target="_blank" class="link-url">${epgUrl}</a>
+                    <div class="link-row">
+                        <div>
+                            <div style="font-weight: bold; color: var(--text-muted); margin-bottom: 5px;">${region.toUpperCase()} EPG</div>
+                            <a href="${epgUrl}" target="_blank" class="link-url">${epgUrl}</a>
+                        </div>
+                        <button class="copy-btn" onclick="copyText('${epgUrl}', this)">Copy</button>
                     </div>
-                    <button class="copy-btn" onclick="copyText('${epgUrl}', this)">Copy</button>
-                </div>
-            `;
-        });
-    }
+                `;
+            });
+        }
 
-    function toggleExtraAccounts() {
-        const extra = document.getElementById('extraAccounts');
-        const toggle = document.getElementById('toggleExtra');
-        extra.className = toggle.checked ? '' : 'hidden';
-    }
+        function toggleExtraAccounts() {
+            const extra = document.getElementById('extraAccounts');
+            const toggle = document.getElementById('toggleExtra');
+            extra.className = toggle.checked ? '' : 'hidden';
+        }
 
-    function copyText(text, btn) {
-        navigator.clipboard.writeText(text).then(() => {
-            const orig = btn.innerText;
-            btn.innerText = "Copied!";
-            btn.style.backgroundColor = "var(--success)";
-            setTimeout(() => {
-                btn.innerText = orig;
-                btn.style.backgroundColor = "var(--accent)";
-            }, 2000);
-        });
-    }
+        function copyText(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.innerText;
+                btn.innerText = "Copied!";
+                btn.style.backgroundColor = "var(--success)";
+                setTimeout(() => {
+                    btn.innerText = orig;
+                    btn.style.backgroundColor = "var(--accent)";
+                }, 2000);
+            });
+        }
 
-    function showToast() {
-        const toast = document.getElementById('toast');
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
-    }
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
 
-    loadSettings();
-</script>
+        loadSettings();
+    </script>
 </body>
 </html>

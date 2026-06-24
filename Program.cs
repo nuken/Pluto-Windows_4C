@@ -33,14 +33,14 @@ namespace PlutoForChannels
 
     public class Program
     {
+        public static string AppDir => Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+
         public static async Task Main(string[] args)
         {
-            // Calculate best port and IP up front
             int targetPort = GetConfiguredPort();
             int activePort = GetAvailablePort(targetPort);
             string serverIp = GetLocalIPAddress();
 
-            // If the port had to change to avoid a conflict, save the new port immediately
             if (activePort != targetPort)
             {
                 SaveConfiguredPort(activePort);
@@ -66,11 +66,9 @@ namespace PlutoForChannels
 
             var app = builder.Build();
 
-            // Serve the Frontend UI from Embedded Resources
             app.MapGet("/", async (HttpContext context) =>
             {
                 var assembly = typeof(Program).Assembly;
-                // Find the embedded resource path (usually it looks like "PlutoForChannels.index.html")
                 var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("index.html"));
                 
                 if (resourceName != null)
@@ -85,15 +83,14 @@ namespace PlutoForChannels
                         return;
                     }
                 }
-                
                 await context.Response.WriteAsync("Error: index.html was not embedded in the executable.");
             });
 
-            // API: Read Settings (Now passes the true Server IP and Port to the frontend)
             app.MapGet("/api/settings", () =>
             {
-                var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
-                AppSettings settings = new AppSettings { SelectedRegions = new List<string> { "all", "local" } };
+                var settingsPath = Path.Combine(AppDir, "settings.json");
+                // Default to just 'local' now
+                AppSettings settings = new AppSettings { SelectedRegions = new List<string> { "local" } };
                 
                 if (File.Exists(settingsPath))
                 {
@@ -108,10 +105,9 @@ namespace PlutoForChannels
                 });
             });
 
-            // API: Save Settings
             app.MapPost("/api/settings", async (AppSettings newSettings, PlutoClient plutoClient) =>
             {
-                var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+                var settingsPath = Path.Combine(AppDir, "settings.json");
                 try
                 {
                     var json = JsonSerializer.Serialize(newSettings, new JsonSerializerOptions { WriteIndented = true });
@@ -120,13 +116,13 @@ namespace PlutoForChannels
                     EpgService.ForceRun(); 
                     return Results.Ok(new { success = true });
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Console.WriteLine($"[ERROR] Failed to save settings to {settingsPath}: {ex.Message}");
                     return Results.StatusCode(500);
                 }
             });
 
-            // --- PLUTO PROXY ROUTES ---
             app.MapGet("/{provider}/{countryCode}/playlist.m3u", async (string provider, string countryCode, HttpContext context, PlutoClient plutoClient) =>
             {
                 var channelIdFormat = context.Request.Query["channel_id_format"].ToString().ToLower();
@@ -138,7 +134,6 @@ namespace PlutoForChannels
 
                 foreach (var s in stations)
                 {
-                    // Use the exact request host/port that the client used to access the M3U
                     var host = context.Request.Host.Value;
                     var url = $"http://{host}/{provider}/{countryCode}/watch/{s.Id}\n";
                     string channelId = channelIdFormat == "id" ? $"{provider}-{s.Id}" : (channelIdFormat == "slug_only" ? $"{s.Slug}" : $"{provider}-{s.Slug}");
@@ -180,15 +175,13 @@ namespace PlutoForChannels
 
             app.MapGet("/{provider}/epg/{countryCode}/{filename}", (string provider, string countryCode, string filename) =>
             {
-                var filePath = Path.Combine(AppContext.BaseDirectory, filename);
+                var filePath = Path.Combine(AppDir, filename);
                 if (!File.Exists(filePath)) return Results.NotFound("EPG file not found.");
                 return Results.File(filePath, contentType: filename.EndsWith(".gz") ? "application/gzip" : "application/xml");
             });
 
             await app.RunAsync();
         }
-
-        // --- BULLETPROOF NETWORK DISCOVERY ---
 
         private static string GetLocalIPAddress()
         {
@@ -197,7 +190,6 @@ namespace PlutoForChannels
                 var interfaces = NetworkInterface.GetAllNetworkInterfaces()
                     .Where(i => i.OperationalStatus == OperationalStatus.Up)
                     .Where(i => i.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                    // Aggressive filtering of virtual/VPN interfaces
                     .Where(i => !i.Description.Contains("Tailscale", StringComparison.OrdinalIgnoreCase))
                     .Where(i => !i.Name.Contains("tailscale", StringComparison.OrdinalIgnoreCase))
                     .Where(i => !i.Name.Contains("docker", StringComparison.OrdinalIgnoreCase))
@@ -213,8 +205,6 @@ namespace PlutoForChannels
                     {
                         string ip = ipInfo.Address.ToString();
                         
-                        // Strict check for private network ranges. 
-                        // Excludes Tailscale CGNAT (100.x.x.x) natively because it's not in these subnets.
                         if (ip.StartsWith("192.168.") || ip.StartsWith("10.") || (ip.StartsWith("172.") && IsPrivateClassB(ipInfo.Address.GetAddressBytes())))
                         {
                             return ip;
@@ -228,7 +218,6 @@ namespace PlutoForChannels
 
         private static bool IsPrivateClassB(byte[] ipBytes)
         {
-            // 172.16.0.0 to 172.31.255.255
             return ipBytes[0] == 172 && ipBytes[1] >= 16 && ipBytes[1] <= 31;
         }
 
@@ -250,7 +239,7 @@ namespace PlutoForChannels
         private static int GetConfiguredPort()
         {
             int targetPort = 7777;
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            var settingsPath = Path.Combine(AppDir, "settings.json");
             if (File.Exists(settingsPath))
             {
                 try
@@ -266,7 +255,7 @@ namespace PlutoForChannels
 
         private static void SaveConfiguredPort(int port)
         {
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            var settingsPath = Path.Combine(AppDir, "settings.json");
             AppSettings settings = new AppSettings { Port = port };
             if (File.Exists(settingsPath))
             {
@@ -283,7 +272,7 @@ namespace PlutoForChannels
             try
             {
                 string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? throw new Exception("Could not determine executable path.");
-                string workingDir = AppContext.BaseDirectory;
+                string workingDir = AppDir;
                 string serviceName = "plutoforchannels.service";
                 string servicePath = $"/etc/systemd/system/{serviceName}";
 
@@ -322,12 +311,39 @@ WantedBy=multi-user.target
                 Console.WriteLine($"---> http://{serverIp}:{activePort} <---");
                 Console.WriteLine("\n==================================================\n");
                 Console.ResetColor();
+                
+                string targetUrl = $"http://{serverIp}:{activePort}";
+                string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+
+                if (!string.IsNullOrEmpty(sudoUser))
+                {
+                    // Pass the command back to the standard user account to prevent sandbox violations
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "sudo", 
+                        Arguments = $"-u {sudoUser} xdg-open {targetUrl}", 
+                        UseShellExecute = false 
+                    });
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "xdg-open", 
+                        Arguments = targetUrl, 
+                        UseShellExecute = false 
+                    });
+                }
             }
             catch (UnauthorizedAccessException)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("ERROR: You must run the install command with sudo: sudo ./PlutoForChannels --install");
                 Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARNING] Could not launch browser automatically: {ex.Message}");
             }
         }
     }

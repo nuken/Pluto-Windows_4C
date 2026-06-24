@@ -34,7 +34,7 @@ namespace PlutoForChannels
 
         private List<string> GetActiveRegions()
         {
-            var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+            var settingsPath = Path.Combine(Program.AppDir, "settings.json");
             if (File.Exists(settingsPath))
             {
                 try
@@ -48,7 +48,8 @@ namespace PlutoForChannels
                 }
                 catch { }
             }
-            return new List<string> { "all", "local" };
+            // Now defaults strictly to local
+            return new List<string> { "local" };
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
