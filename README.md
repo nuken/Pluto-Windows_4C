@@ -50,7 +50,7 @@ During installation, the app creates a file named `Pluto Dashboard.desktop` in t
 
 ## Setup in Channels DVR
 
-1. Open the PlutoForChannels dashboard.
+1. Open the Pluto Proxy dashboard.
 2. Select the regions you wish to use.
 3. In your **Channels DVR Web Admin**, go to **Settings** > **Sources** > **Add Source** > **Custom Channels**.
 
