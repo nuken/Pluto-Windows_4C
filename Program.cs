@@ -301,15 +301,14 @@ WantedBy=multi-user.target
                 Console.WriteLine("Enabling and starting service...");
                 Process.Start("systemctl", $"enable --now {serviceName}")?.WaitForExit();
 
-                // --- PROPER UBUNTU START MENU INTEGRATION ---
-                // We place the icon and shortcut in the global system directories so Ubuntu recognizes it natively.
-                string globalIconPath = "/usr/share/pixmaps/plutoforchannels.ico";
-                string globalDesktopPath = "/usr/share/applications/plutoforchannels.desktop";
+                // --- SHORTCUT CREATION & OWNERSHIP FIX ---
+                string iconPath = Path.Combine(AppDir, "icon.ico");
+                string desktopFilePath = Path.Combine(AppDir, "Pluto Dashboard.desktop");
                 string targetUrl = $"http://{serverIp}:{activePort}";
 
                 try
                 {
-                    // 1. Extract the icon to the system pixmaps folder
+                    // Extract the icon from embedded resources
                     var assembly = typeof(Program).Assembly;
                     var resourceName = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("icon.ico"));
                     if (resourceName != null)
@@ -317,31 +316,48 @@ WantedBy=multi-user.target
                         using Stream? stream = assembly.GetManifestResourceStream(resourceName);
                         if (stream != null)
                         {
-                            using FileStream fileStream = new FileStream(globalIconPath, FileMode.Create, FileAccess.Write);
+                            using FileStream fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write);
                             stream.CopyTo(fileStream);
                         }
                     }
 
-                    // 2. Write the .desktop file to the system applications folder
+                    // Create the .desktop shortcut
                     string desktopShortcut = $@"
 [Desktop Entry]
 Version=1.0
 Name=Pluto Dashboard
 Comment=Manage PlutoForChannels Proxy
 Exec=xdg-open {targetUrl}
-Icon={globalIconPath}
+Icon={iconPath}
 Terminal=false
 Type=Application
-Categories=Network;Utility;
+Categories=Network;
 ";
-                    File.WriteAllText(globalDesktopPath, desktopShortcut.Trim());
+                    File.WriteAllText(desktopFilePath, desktopShortcut.Trim());
 
-                    // 3. Ensure proper read permissions for all users
-                    Process.Start("chmod", $"644 \"{globalDesktopPath}\"")?.WaitForExit();
+                    // Fix ownership so the regular user can double-click it without permission errors
+                    string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+                    if (!string.IsNullOrEmpty(sudoUser))
+                    {
+                        Process.Start(new ProcessStartInfo 
+                        { 
+                            FileName = "chown", 
+                            Arguments = $"{sudoUser}:{sudoUser} \"{desktopFilePath}\" \"{iconPath}\"", 
+                            UseShellExecute = false 
+                        })?.WaitForExit();
+                    }
+
+                    // Make the shortcut executable
+                    Process.Start(new ProcessStartInfo 
+                    { 
+                        FileName = "chmod", 
+                        Arguments = $"+x \"{desktopFilePath}\"", 
+                        UseShellExecute = false 
+                    })?.WaitForExit();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[WARNING] Failed to add icon to Ubuntu App Launcher: {ex.Message}");
+                    Console.WriteLine($"[WARNING] Failed to create desktop shortcut: {ex.Message}");
                 }
 
                 Console.ForegroundColor = ConsoleColor.Green;
@@ -350,8 +366,8 @@ Categories=Network;Utility;
                 Console.WriteLine("==================================================");
                 Console.WriteLine($"\nNetwork IP Discovered : {serverIp}");
                 Console.WriteLine($"Service Port Assigned : {activePort}");
-                Console.WriteLine($"\nThe 'Pluto Dashboard' has been added to your Ubuntu Application Menu!");
-                Console.WriteLine($"Press the Windows/Super key and type 'Pluto' to open the dashboard.");
+                Console.WriteLine($"\nA clickable shortcut 'Pluto Dashboard' with your icon");
+                Console.WriteLine($"has been created in {AppDir}");
                 Console.WriteLine("\n==================================================\n");
                 Console.ResetColor();
             }
