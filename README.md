@@ -1,4 +1,4 @@
-# Pluto for Channels (Linux Proxy)
+# Pluto Proxy (Linux Proxy)
 
 A lightweight, headless Linux daemon that bridges Pluto TV and Channels DVR. 
 
