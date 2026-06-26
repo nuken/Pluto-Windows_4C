@@ -348,17 +348,43 @@
         }
 
         function copyText(text, btn) {
+            // Check if we are blocked by browser security (e.g., using HTTP with a local IP)
+            if (!navigator.clipboard || !window.isSecureContext) {
+                // Fallback for non-secure contexts
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    triggerCopiedAnimation(btn);
+                } catch (err) {
+                    console.error("Fallback copy failed", err);
+                    alert("Your browser blocked the copy action. Please manually select and copy the link.");
+                }
+                document.body.removeChild(textArea);
+                return;
+            }
+
+            // Modern API for localhost or HTTPS
             navigator.clipboard.writeText(text).then(() => {
-                const orig = btn.innerText;
-                btn.innerText = "Copied!";
-                btn.style.backgroundColor = "var(--success)";
-                setTimeout(() => {
-                    btn.innerText = orig;
-                    btn.style.backgroundColor = "var(--accent)";
-                }, 2000);
+                triggerCopiedAnimation(btn);
+            }).catch(err => {
+                console.error("Async copy failed", err);
             });
         }
 
+        function triggerCopiedAnimation(btn) {
+            const orig = btn.innerText;
+            btn.innerText = "Copied!";
+            btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => {
+                btn.innerText = orig;
+                btn.style.backgroundColor = "var(--accent)";
+            }, 2000);
+        }
         function showToast() {
             const toast = document.getElementById('toast');
             toast.classList.add('show');
