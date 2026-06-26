@@ -336,7 +336,7 @@ Categories=Network;
                     File.WriteAllText(desktopFilePath, desktopShortcut.Trim());
 
                     // Fix ownership so the regular user can double-click it without permission errors
-                    string sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+                    string? sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
                     if (!string.IsNullOrEmpty(sudoUser))
                     {
                         Process.Start(new ProcessStartInfo 
