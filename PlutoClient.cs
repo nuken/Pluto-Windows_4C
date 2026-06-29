@@ -97,8 +97,9 @@ namespace PlutoForChannels
 
                 var query = HttpUtility.ParseQueryString(string.Empty);
                 query["appName"] = "web";
-                query["appVersion"] = "8.0.0-111b2b9dc00bd0bea9030b30662159ed9e7c8bc6";
-                query["deviceVersion"] = "142.0.0";
+                // Updated to match current Pluto Web deployment
+                query["appVersion"] = "9.22.0-ba99318afe50de3c8a02021f4c92fd52f2c47a00";
+                query["deviceVersion"] = "149.0.0";
                 query["deviceModel"] = "web";
                 query["deviceMake"] = "chrome";
                 query["deviceType"] = "web";
@@ -110,6 +111,9 @@ namespace PlutoForChannels
                 query["notificationVersion"] = "1";
                 query["appLaunchCount"] = "";
                 query["lastAppLaunchDate"] = "";
+                
+                // NEW: Pluto now tracks the local client time during boot
+                query["clientTime"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
 
                 var accounts = GetValidAccounts();
                 var (username, password) = accounts[accountIndex % accounts.Count];
@@ -123,18 +127,19 @@ namespace PlutoForChannels
                 var requestUri = $"https://boot.pluto.tv/v4/start?{query}";
                 var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+                // Updated Request Headers for Chrome 149 fingerprinting
                 request.Headers.Add("authority", "boot.pluto.tv");
                 request.Headers.Add("accept", "*/*");
                 request.Headers.Add("accept-language", "en-US,en;q=0.9");
                 request.Headers.Add("origin", "https://pluto.tv");
                 request.Headers.Add("referer", "https://pluto.tv/");
-                request.Headers.Add("sec-ch-ua", "\"Chromium\";v=\"142\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"142\"");
+                request.Headers.Add("sec-ch-ua", "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"");
                 request.Headers.Add("sec-ch-ua-mobile", "?0");
                 request.Headers.Add("sec-ch-ua-platform", "\"Windows\"");
                 request.Headers.Add("sec-fetch-dest", "empty");
                 request.Headers.Add("sec-fetch-mode", "cors");
                 request.Headers.Add("sec-fetch-site", "same-site");
-                request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+                request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36");
 
                 if (_xForward.TryGetValue(countryCode, out var ip) && !string.IsNullOrEmpty(ip))
                 {
