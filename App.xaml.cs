@@ -239,7 +239,7 @@ namespace PlutoForChannels
 
                 // FIX 2: Ensure the Stitcher deviceId perfectly matches the boot clientID
                 query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
-                query["sid"] = Guid.NewGuid().ToString(); 
+                //query["sid"] = Guid.NewGuid().ToString(); 
 
                 if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
                 query["masterJWTPassthrough"] = "true";
