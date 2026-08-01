@@ -332,7 +332,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
 		private async void CheckVersion_Click(object sender, RoutedEventArgs e)
         {
             // The current version of this build
-            string currentVersion = "v1.1.9"; 
+            string currentVersion = "v1.2.0"; 
             
             // The raw URL to your GitHub text file
             string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/main/version.txt";
