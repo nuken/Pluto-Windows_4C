@@ -100,7 +100,7 @@ namespace PlutoForChannels
                 <head>
                     <meta charset=""utf-8"">
                     <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
-                    <title>Pluto Universal</title>
+                    <title>Pluto for Channels .NET</title>
                     <style>
                         body {{ background-color: #1a1a1a; color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 2rem; }}
                         h1 {{ color: #ffffff; margin-bottom: 5px; }}
@@ -141,7 +141,7 @@ namespace PlutoForChannels
                 </head>
                 <body>
                     <div class=""container"">
-                        <h1>Pluto Universal <span class=""tag"">v{version}</span></h1>
+                        <h1>Pluto for Channels .NET <span class=""tag"">v{version}</span></h1>
                         <p style=""color: #888; margin-bottom: 25px;"">Background proxy server is actively running.</p>
                         <div style=""background-color: #1a1a1a; border-radius: 6px; padding: 5px;"">");
 

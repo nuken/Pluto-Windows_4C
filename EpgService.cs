@@ -98,7 +98,7 @@ namespace PlutoForChannels
             if (channels == null || !channels.Any()) return;
 
             var tvElement = new XElement("tv",
-                new XAttribute("generator-info-name", "PlutoUniversal.NET"),
+                new XAttribute("generator-info-name", "PlutoForChannels.NET"),
                 new XAttribute("generated-ts", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString())
             );
 

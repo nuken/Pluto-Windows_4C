@@ -31,7 +31,7 @@ namespace PlutoForChannels
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
             _notifyIcon.Icon = System.Drawing.SystemIcons.Information;
-            _notifyIcon.Text = "Pluto Universal";
+            _notifyIcon.Text = "Pluto for Channels .NET";
             _notifyIcon.Visible = true;
 
             _notifyIcon.DoubleClick += (s, e) =>

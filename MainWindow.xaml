@@ -1,7 +1,7 @@
 ﻿<Window x:Class="PlutoForChannels.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Pluto Universal" Height="800" Width="800" Background="#1A1A1A">
+        Title="Pluto for Channels - .NET" Height="800" Width="800" Background="#1A1A1A">
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250"/>
@@ -53,7 +53,7 @@
 
         <StackPanel Grid.Column="1">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                <TextBlock Text="Pluto Universal v1.1.7" FontSize="24" Foreground="White" FontWeight="Bold"/>
+                <TextBlock Text="Pluto for Channels v1.1.7" FontSize="24" Foreground="White" FontWeight="Bold"/>
                 <Button Content="Check for Updates" Margin="15,0,0,0" Padding="10,0" 
                         Background="#3273DC" Foreground="White" BorderThickness="0" 
                         Cursor="Hand" Click="CheckVersion_Click"/>
