@@ -1,8 +1,8 @@
-name: Build PlutoForChannels EXE
+name: Build PlutoUniversal EXE
 
 on:
   push:
-    branches: [ "Universal", "master" ]
+    branches: [ "Universal" ]
   workflow_dispatch: 
 
 jobs:
