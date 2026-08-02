@@ -19,10 +19,12 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Publish Executable
-      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:ApplicationIcon=icon.ico
+      # Added -p:AssemblyName=PlutoUniversal to rename the output executable
+      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:ApplicationIcon=icon.ico -p:AssemblyName=PlutoUniversal
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v7
       with:
         name: PlutoForChannels-Windows-x64
-        path: bin/Release/net10.0-windows/win-x64/publish/PlutoForChannels.exe
+        # Updated the path to look for PlutoUniversal.exe
+        path: bin/Release/net10.0-windows/win-x64/publish/PlutoUniversal.exe
