@@ -178,19 +178,19 @@ namespace PlutoForChannels
         int number = episode?["number"]?.GetValue<int>() ?? 0;
 
         if (progType == "live")
-{
-    // Trust Pluto's "live" flag regardless of the release date
-    programme.Add(new XElement("live"));
-    programme.Add(new XElement("new"));
-    
-    // Suppress meaningless "Season 1, Episode 0" AND "Season 1, Episode 1" for live news broadcasts
-    // This removes the S01E01 tag, preventing Channels DVR from flagging it as a Series Premiere
-    if (season > 0 && number > 0 && !(season == 1 && number <= 1))
-    {
-        programme.Add(new XElement("episode-num", 
-            new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
-    }
-}
+        {
+            // Trust Pluto's "live" flag regardless of the release date
+            programme.Add(new XElement("live"));
+            programme.Add(new XElement("new"));
+            
+            // Suppress meaningless "Season 1, Episode 0" AND "Season 1, Episode 1" for live news broadcasts
+            // This removes the S01E01 tag, preventing media servers from flagging it as a Series Premiere
+            if (season > 0 && number > 0 && !(season == 1 && number <= 1))
+            {
+                programme.Add(new XElement("episode-num", 
+                    new XAttribute("system", "onscreen"), $"S{season:D2}E{number:D2}"));
+            }
+        }
         else if (progType != "film" && (season > 0 || number > 0))
         {
             programme.Add(new XElement("episode-num", 
@@ -200,7 +200,7 @@ namespace PlutoForChannels
         string episodeId = episode?["_id"]?.ToString() ?? "";
         if (!string.IsNullOrEmpty(episodeId))
         {
-            // Append the start timestamp to the episode ID for live programs so Channels DVR doesn't skip them as duplicates
+            // Append the start timestamp to the episode ID for live programs so they aren't skipped as duplicates
             if (progType == "live" && !string.IsNullOrEmpty(start))
             {
                 string timeStamp = start.Split(' ')[0]; // Extracts "yyyyMMddHHmmss" from the parsed time

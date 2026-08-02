@@ -199,7 +199,8 @@ namespace PlutoForChannels
                 if (stations == null || stations.Count == 0) return Results.Text("Error loading channels", statusCode: 500);
 
                 var sb = new StringBuilder();
-                sb.AppendLine("#EXTM3U\r\n");
+                string epgUrl = $"http://{host}/{provider}/epg/{countryCode}/epg-{countryCode}.xml";
+                sb.AppendLine($"#EXTM3U url-tvg=\"{epgUrl}\"\r\n");
 
                 foreach (var s in stations)
                 {
@@ -210,10 +211,8 @@ namespace PlutoForChannels
 
                     sb.Append($"#EXTINF:-1 channel-id=\"{channelId}\" tvg-id=\"{s.Id}\" tvg-chno=\"{s.Number}\"");
                     if (!string.IsNullOrEmpty(s.Group)) sb.Append($" group-title=\"{s.Group}\"");
-                    if (!string.IsNullOrEmpty(s.Logo)) { sb.Append($" tvg-logo=\"{s.Logo}\" tvc-guide-art=\"{s.Logo}\""); }
+                    if (!string.IsNullOrEmpty(s.Logo)) sb.Append($" tvg-logo=\"{s.Logo}\"");
                     if (!string.IsNullOrEmpty(s.TmsId)) sb.Append($" tvg-name=\"{s.TmsId}\"");
-                    if (!string.IsNullOrEmpty(s.Name)) sb.Append($" tvc-guide-title=\"{s.Name}\"");
-                    if (!string.IsNullOrEmpty(desc)) sb.Append($" tvc-guide-description=\"{desc}\"");
                     sb.AppendLine($",{s.Name}\n{url}");
                 }
                 return Results.Text(sb.ToString(), "audio/x-mpegurl");
