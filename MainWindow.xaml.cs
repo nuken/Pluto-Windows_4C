@@ -31,7 +31,7 @@ namespace PlutoForChannels
         {
             _notifyIcon = new System.Windows.Forms.NotifyIcon();
             _notifyIcon.Icon = System.Drawing.SystemIcons.Information;
-            _notifyIcon.Text = "Pluto for Channels .NET";
+            _notifyIcon.Text = "Pluto Universal";
             _notifyIcon.Visible = true;
 
             _notifyIcon.DoubleClick += (s, e) =>
@@ -165,7 +165,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
                 this.Hide();     // Hide it from the taskbar
 
                 // Show a little Windows notification balloon
-                _notifyIcon?.ShowBalloonTip(2000, "Pluto for Channels", "Server is still running in the background.", System.Windows.Forms.ToolTipIcon.Info);
+                _notifyIcon?.ShowBalloonTip(2000, "Pluto Universal", "Server is still running in the background.", System.Windows.Forms.ToolTipIcon.Info);
             }
             else
             {
@@ -332,13 +332,13 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
 		private async void CheckVersion_Click(object sender, RoutedEventArgs e)
         {
             // The current version of this build
-            string currentVersion = "v1.1.7"; 
+            string currentVersion = "v1.2.1"; 
             
             // The raw URL to your GitHub text file
-            string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/main/version.txt";
+            string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/Universal/version.txt";
             
             // The URL to your GitHub releases page
-            string releasesUrl = "https://github.com/nuken/Pluto-Windows_4C/releases/latest";
+            string releasesUrl = "https://github.com/nuken/Pluto-Windows_4C/releases/tag/universal";
             
             try
             {
