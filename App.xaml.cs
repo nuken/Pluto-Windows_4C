@@ -92,7 +92,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.2.0"; // Matches your Windows Desktop UI version
+                var version = "1.1.7"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
@@ -208,7 +208,7 @@ namespace PlutoForChannels
                     // Strip commas from the description so VLC doesn't mistakenly split the EXTINF string
                     string desc = string.IsNullOrEmpty(s.Summary) ? "" : new string(s.Summary.Where(c => !char.IsControl(c)).ToArray()).Replace(",", " ");
 
-                    sb.Append($"#EXTINF:-1 channel-id=\"{channelId}\" tvg-id=\"{s.Id}\" tvg-chno=\"{s.Number}\" tvc-stream-timestamps=\"rewrite\"");
+                    sb.Append($"#EXTINF:-1 channel-id=\"{channelId}\" tvg-id=\"{s.Id}\" tvg-chno=\"{s.Number}\"");
                     if (!string.IsNullOrEmpty(s.Group)) sb.Append($" group-title=\"{s.Group}\"");
                     if (!string.IsNullOrEmpty(s.Logo)) { sb.Append($" tvg-logo=\"{s.Logo}\" tvc-guide-art=\"{s.Logo}\""); }
                     if (!string.IsNullOrEmpty(s.TmsId)) sb.Append($" tvg-name=\"{s.TmsId}\"");
@@ -239,7 +239,7 @@ namespace PlutoForChannels
 
                 // FIX 2: Ensure the Stitcher deviceId perfectly matches the boot clientID
                 query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
-                //query["sid"] = Guid.NewGuid().ToString(); 
+                query["sid"] = Guid.NewGuid().ToString(); 
 
                 if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
                 query["masterJWTPassthrough"] = "true";
