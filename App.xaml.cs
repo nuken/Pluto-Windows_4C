@@ -220,37 +220,41 @@ namespace PlutoForChannels
             });
 
             // 3. Watch Route (Multi-Stream Unlocked & Deterministically Load Balanced)
-            _host.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
-            {
-                // FIX 1: Lock the index to the Channel ID instead of a rolling counter.
-                // This guarantees reconnects during ad breaks stay on the exact same account and device!
-                int streamIndex = id.GetHashCode() & int.MaxValue;
-                
-                var bootData = await plutoClient.GetBootDataAsync(countryCode, streamIndex, streamIndex);
-                if (bootData == null) return Results.StatusCode(500);
+_host.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
+{
+    // Lock the index to the Channel ID instead of a rolling counter.
+    // This guarantees reconnects stay on the exact same account and device!
+    int streamIndex = id.GetHashCode() & int.MaxValue;
+    
+    var bootData = await plutoClient.GetBootDataAsync(countryCode, streamIndex, streamIndex);
+    if (bootData == null) return Results.StatusCode(500);
 
-                var token = bootData["sessionToken"]?.ToString() ?? "";
-                var stitcherParams = bootData["stitcherParams"]?.ToString() ?? "";
-                
-                var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
-                var basePath = $"/stitch/hls/channel/{id}/master.m3u8";
+    var token = bootData["sessionToken"]?.ToString() ?? "";
+    var stitcherParams = bootData["stitcherParams"]?.ToString() ?? "";
+    
+    var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
+    var basePath = $"/stitch/hls/channel/{id}/master.m3u8";
 
-                var query = HttpUtility.ParseQueryString(stitcherParams);
+    var query = HttpUtility.ParseQueryString(stitcherParams);
 
-                // FIX 2: Ensure the Stitcher deviceId perfectly matches the boot clientID
-                query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
-                query["sid"] = Guid.NewGuid().ToString(); 
+    // Ensure the Stitcher deviceId perfectly matches the boot clientID
+    query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
+    
+    // FIX: Generate a persistent, deterministic SID based on the channel ID.
+    // Reconnect attempts for the same stream now maintain the identical Session ID.
+    byte[] hash = System.Security.Cryptography.MD5.HashData(Encoding.UTF8.GetBytes(id));
+    query["sid"] = new Guid(hash).ToString(); 
 
-                if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
-                query["masterJWTPassthrough"] = "true";
-                query["includeExtendedEvents"] = "true";
+    if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
+    query["masterJWTPassthrough"] = "true";
+    query["includeExtendedEvents"] = "true";
 
-                string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
+    string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
 
-                int activeAccounts = Math.Max(1, plutoClient.GetValidAccounts().Count);
-                LogToConsole($"[WATCH] ... account #{streamIndex % activeAccounts + 1} ...");
-                return Results.Redirect(videoUrl, permanent: false);
-            });
+    int activeAccounts = Math.Max(1, plutoClient.GetValidAccounts().Count);
+    LogToConsole($"[WATCH] ... account #{streamIndex % activeAccounts + 1} ...");
+    return Results.Redirect(videoUrl, permanent: false);
+});
 
             // 4. EPG File Route
             _host.MapGet("/{provider}/epg/{countryCode}/{filename}", (string provider, string countryCode, string filename) =>
