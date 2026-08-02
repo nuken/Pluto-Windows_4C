@@ -2,7 +2,7 @@
 
 $TaskName = "PlutoForChannels_BackgroundService"
 $InstallDir = $PSScriptRoot
-$ExePath = Join-Path -Path $InstallDir -ChildPath "PlutoForChannels.exe"
+$ExePath = Join-Path -Path $InstallDir -ChildPath "PlutoUniversal.exe"
 
 # 1. Stop the hidden background server
 Write-Host "Stopping headless background server..." -ForegroundColor Yellow

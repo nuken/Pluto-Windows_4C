@@ -2,7 +2,7 @@
 
 # Get the folder where this script (and the EXE) is currently located
 $InstallDir = $PSScriptRoot
-$ExePath = Join-Path -Path $InstallDir -ChildPath "PlutoForChannels.exe"
+$ExePath = Join-Path -Path $InstallDir -ChildPath "PlutoUniversal.exe"
 
 # Define the Task Name
 $TaskName = "PlutoForChannels_BackgroundService"
