@@ -124,31 +124,31 @@ namespace PlutoForChannels
             });
 
             app.MapGet("/{provider}/{countryCode}/playlist.m3u", async (string provider, string countryCode, HttpContext context, PlutoClient plutoClient) =>
-            {
-                var channelIdFormat = context.Request.Query["channel_id_format"].ToString().ToLower();
-                var stations = await plutoClient.GetChannelsAsync(countryCode);
-                if (stations == null || stations.Count == 0) return Results.Text("Error loading channels", statusCode: 500);
+{
+    var channelIdFormat = context.Request.Query["channel_id_format"].ToString().ToLower();
+    var stations = await plutoClient.GetChannelsAsync(countryCode);
+    if (stations == null || stations.Count == 0) return Results.Text("Error loading channels", statusCode: 500);
 
-                var sb = new StringBuilder();
-                sb.AppendLine("#EXTM3U\r\n");
+    var sb = new StringBuilder();
+    sb.AppendLine("#EXTM3U\r\n");
 
-                foreach (var s in stations)
-                {
-                    var host = context.Request.Host.Value;
-                    var url = $"http://{host}/{provider}/{countryCode}/watch/{s.Id}\n";
-                    string channelId = channelIdFormat == "id" ? $"{provider}-{s.Id}" : (channelIdFormat == "slug_only" ? $"{s.Slug}" : $"{provider}-{s.Slug}");
-                    string desc = string.IsNullOrEmpty(s.Summary) ? "" : new string(s.Summary.Where(c => !char.IsControl(c)).ToArray()).Replace(",", " ");
+    foreach (var s in stations)
+    {
+        var host = context.Request.Host.Value;
+        var url = $"http://{host}/{provider}/{countryCode}/watch/{s.Id}\n";
+        string channelId = channelIdFormat == "id" ? $"{provider}-{s.Id}" : (channelIdFormat == "slug_only" ? $"{s.Slug}" : $"{provider}-{s.Slug}");
+        string desc = string.IsNullOrEmpty(s.Summary) ? "" : new string(s.Summary.Where(c => !char.IsControl(c)).ToArray()).Replace(",", " ");
 
-                    sb.Append($"#EXTINF:-1 channel-id=\"{channelId}\" tvg-id=\"{s.Id}\" tvg-chno=\"{s.Number}\"");
-                    if (!string.IsNullOrEmpty(s.Group)) sb.Append($" group-title=\"{s.Group}\"");
-                    if (!string.IsNullOrEmpty(s.Logo)) { sb.Append($" tvg-logo=\"{s.Logo}\" tvc-guide-art=\"{s.Logo}\""); }
-                    if (!string.IsNullOrEmpty(s.TmsId)) sb.Append($" tvg-name=\"{s.TmsId}\"");
-                    if (!string.IsNullOrEmpty(s.Name)) sb.Append($" tvc-guide-title=\"{s.Name}\"");
-                    if (!string.IsNullOrEmpty(desc)) sb.Append($" tvc-guide-description=\"{desc}\"");
-                    sb.AppendLine($",{s.Name}\n{url}");
-                }
-                return Results.Text(sb.ToString(), "audio/x-mpegurl");
-            });
+        sb.Append($"#EXTINF:-1 channel-id=\"{channelId}\" tvg-id=\"{s.Id}\" tvg-chno=\"{s.Number}\" tvc-stream-timestamps=\"rewrite\"");
+        if (!string.IsNullOrEmpty(s.Group)) sb.Append($" group-title=\"{s.Group}\"");
+        if (!string.IsNullOrEmpty(s.Logo)) { sb.Append($" tvg-logo=\"{s.Logo}\" tvc-guide-art=\"{s.Logo}\""); }
+        if (!string.IsNullOrEmpty(s.TmsId)) sb.Append($" tvg-name=\"{s.TmsId}\"");
+        if (!string.IsNullOrEmpty(s.Name)) sb.Append($" tvc-guide-title=\"{s.Name}\"");
+        if (!string.IsNullOrEmpty(desc)) sb.Append($" tvc-guide-description=\"{desc}\"");
+        sb.AppendLine($",{s.Name}\n{url}");
+    }
+    return Results.Text(sb.ToString(), "audio/x-mpegurl");
+});
 
             app.MapGet("/{provider}/{countryCode}/watch/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
             {
