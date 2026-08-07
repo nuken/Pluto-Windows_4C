@@ -14,7 +14,7 @@ This application acts as a local proxy, generating dynamic M3U playlists and EPG
 
 ## Installation
 
-Because this application installs itself as a permanent background system service, you must place the downloaded file in the exact folder where you want it to live forever before running the installer. [Linux Release](https://github.com/nuken/Pluto-Windows_4C/releases/tag/v1-linux)
+Because this application installs itself as a permanent background system service, you must place the downloaded file in the exact folder where you want it to live forever before running the installer. [Linux Release](https://github.com/nuken/Pluto-Windows_4C/releases/tag/v1.2.0-linux)
 
 1. Download the compiled `PlutoForChannels` Linux binary.
 2. Move the file to your preferred permanent location (e.g., create a folder on your Desktop or in your Home directory and put the file inside).
