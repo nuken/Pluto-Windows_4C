@@ -198,7 +198,9 @@ namespace PlutoForChannels
         }
 
         string episodeId = episode?["_id"]?.ToString() ?? "";
-        if (!string.IsNullOrEmpty(episodeId))
+        
+        // Fix: Only add the Pluto episode ID if the program is not a film
+        if (!string.IsNullOrEmpty(episodeId) && progType != "film")
         {
             // Append the start timestamp to the episode ID for live programs so Channels DVR doesn't skip them as duplicates
             if (progType == "live" && !string.IsNullOrEmpty(start))
@@ -224,15 +226,20 @@ namespace PlutoForChannels
                 // Suppress BOTH tags if it evaluates to the 1969/1970 Unix Epoch placeholder
                 if (airDt.Year > 1970)
                 {
-                    programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDt.ToString("yyyy-MM-dd HH:mm:ss")));
+                    // Fix: Ensure movies only get the <date> tag and NOT an <episode-num> tag
+                    if (progType != "film") 
+                    {
+                        programme.Add(new XElement("episode-num", new XAttribute("system", "original-air-date"), airDt.ToString("yyyy-MM-dd HH:mm:ss")));
+                    }
                     programme.Add(new XElement("date", airDt.ToString("yyyyMMdd")));
                 }
             }
         }
 
         // 4. Series ID
+        // Fix: Exclude Series ID for movies to further prevent DVR confusion
         string seriesId = series?["_id"]?.ToString() ?? "";
-        if (!string.IsNullOrEmpty(seriesId))
+        if (!string.IsNullOrEmpty(seriesId) && progType != "film")
         {
             programme.Add(new XElement("series-id", new XAttribute("system", "pluto"), seriesId));
         }
