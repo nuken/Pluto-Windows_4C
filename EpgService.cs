@@ -35,37 +35,36 @@ namespace PlutoForChannels
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            App.LogToConsole("[INFO] Initializing EPG Scheduler");
+            // Replace App.LogToConsole with standard Console output
+            Console.WriteLine("[INFO] Initializing EPG Scheduler");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    // Check which regions the user has actually selected in the UI
-                    var activeRegions = App.AppWindow?.Regions
-                        .Where(r => r.IsSelected && r.Name != "all")
-                        .Select(r => r.Name)
-                        .ToList() ?? new List<string>();
+                    // Because a Linux daemon has no UI to select regions,
+                    // we define the target regions directly.
+                    // Add other regions (like "uk", "ca") to this list if desired,
+                    // or read them from your settings.json file.
+                    var activeRegions = new List<string> { "local" };
 
                     if (activeRegions.Any())
                     {
-                        App.LogToConsole($"[INFO] Running EPG Cycle for: {string.Join(", ", activeRegions)}");
-                        
+                        Console.WriteLine($"[INFO] Running EPG Cycle for: {string.Join(", ", activeRegions)}");
+
                         foreach (var country in activeRegions)
                         {
                             await GenerateXmlFileAsync(country, stoppingToken);
                         }
 
-                        // Always generate 'all' if the user wants it
-                        if (App.AppWindow?.Regions.Any(r => r.Name == "all" && r.IsSelected) == true)
-                        {
-                            await GenerateXmlFileAsync("all", stoppingToken);
-                        }
+                        // Optional: Generate an 'all' file if you want a combined guide for Linux
+                        // await GenerateXmlFileAsync("all", stoppingToken);
                     }
                 }
                 catch (Exception ex)
                 {
-                    App.LogToConsole($"[ERROR] EPG Scheduler: {ex.Message}");
+                    // Replace App.LogToConsole with standard Console output
+                    Console.WriteLine($"[ERROR] EPG Scheduler: {ex.Message}");
                 }
 
                 // Wait for 2 hours OR until ForceRun() is called
@@ -78,7 +77,7 @@ namespace PlutoForChannels
                 {
                     // The delay was interrupted by ForceRun!
                 }
-                
+
                 // Reset the wake-up token for the next nap
                 if (_delayTokenSource.IsCancellationRequested)
                 {
