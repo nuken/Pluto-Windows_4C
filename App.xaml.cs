@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Web;
 using System.Windows;
 using Microsoft.AspNetCore.Builder;
@@ -20,12 +21,25 @@ namespace PlutoForChannels
         private WebApplication? _host;
         public static MainWindow? AppWindow { get; private set; }
         public static PlutoClient? GlobalPlutoClient { get; private set; }
+		private static Mutex? _instanceMutex = null;
         private static int _currentPort = 7777; 
         public static int StreamCounter = 0;
 
         private async void Application_Startup(object sender, StartupEventArgs e)
 {
-    AppWindow = new MainWindow();
+    const string appName = "PlutoForChannels.SingleInstance";
+            bool createdNew;
+
+            _instanceMutex = new Mutex(true, appName, out createdNew);
+
+            if (!createdNew)
+            {
+                // Another instance is already running, shut down immediately
+                System.Windows.Application.Current.Shutdown();
+                return;
+            }
+	
+	AppWindow = new MainWindow();
 
     LogToConsole("Initializing ASP.NET Core Web Host...");
 
@@ -92,7 +106,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.2.1"; // Matches your Windows Desktop UI version
+                var version = "1.2.2"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
