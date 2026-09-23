@@ -23,7 +23,7 @@ namespace PlutoForChannels
         private readonly Dictionary<string, string> _xForward = new()
         {
             { "local", "" },
-            { "uk", "178.238.11.6" },
+            { "uk", "86.160.18.64" },
             { "ca", "192.206.151.131" },
             { "fr", "193.169.64.141" },
             { "de", "81.173.176.155" },

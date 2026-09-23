@@ -106,7 +106,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.2.2"; // Matches your Windows Desktop UI version
+                var version = "1.2.3"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
