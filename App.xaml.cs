@@ -106,7 +106,7 @@ namespace PlutoForChannels
             _host.MapGet("/", (HttpContext context) => 
             {
                 var host = context.Request.Host.Value;
-                var version = "1.2.3"; // Matches your Windows Desktop UI version
+                var version = "1.2.4"; // Matches your Windows Desktop UI version
                 
                 var sb = new StringBuilder();
                 sb.Append($@"<!DOCTYPE html>
@@ -173,6 +173,7 @@ namespace PlutoForChannels
                     {
                         string m3uUrl = $"http://{host}/pluto/{region}/playlist.m3u";
                         string epgUrl = $"http://{host}/pluto/epg/{region}/epg-{region}.xml";
+                        string vodUrl = $"http://{host}/pluto/{region}/vod.json"; // NEW
 
                         sb.Append($@"
                             <div class=""list-item"">
@@ -188,6 +189,13 @@ namespace PlutoForChannels
                                     <a href=""{epgUrl}"" target=""_blank"">{epgUrl}</a>
                                 </div>
                                 <button class=""copy-button"" onclick=""copyToClipboard('{epgUrl}', this)"">Copy</button>
+                            </div>
+                            <div class=""list-item"">
+                                <div>
+                                    <span class=""label"">{region.ToUpper()} VOD:</span>
+                                    <a href=""{vodUrl}"" target=""_blank"">{vodUrl}</a>
+                                </div>
+                                <button class=""copy-button"" onclick=""copyToClipboard('{vodUrl}', this)"">Copy</button>
                             </div>");
                     }
                 }
@@ -272,6 +280,99 @@ namespace PlutoForChannels
                 var filePath = Path.Combine(AppContext.BaseDirectory, filename);
                 if (!File.Exists(filePath)) return Results.NotFound("EPG file not found.");
                 return Results.File(filePath, contentType: filename.EndsWith(".gz") ? "application/gzip" : "application/xml");
+            });
+			
+			// 5. VOD Catalog JSON Route
+            _host.MapGet("/{provider}/{countryCode}/vod.json", async (string provider, string countryCode, HttpContext context, PlutoClient plutoClient) =>
+            {
+                var host = context.Request.Host.Value;
+                App.LogToConsole($"[INFO] VOD Catalog requested for {countryCode}");
+
+                var catalogData = await plutoClient.GetVodCatalogAsync(countryCode);
+                if (catalogData == null) return Results.Text("Error loading VOD catalog", statusCode: 500);
+
+                var categories = catalogData["categories"]?.AsArray();
+                if (categories == null) return Results.Json(new object[0]);
+
+                var vodItems = new System.Collections.Generic.List<object>();
+                var processedIds = new System.Collections.Generic.HashSet<string>();
+
+                foreach (var category in categories)
+                {
+                    var items = category["items"]?.AsArray();
+                    if (items == null) continue;
+
+                    foreach (var item in items)
+                    {
+                        var type = item["type"]?.ToString();
+                        var id = item["_id"]?.ToString();
+                        
+                        if (type != "movie" || string.IsNullOrEmpty(id)) continue;
+                        if (!processedIds.Add(id)) continue;
+
+                        var name = item["name"]?.ToString() ?? "Unknown";
+                        var desc = item["description"]?.ToString() ?? item["summary"]?.ToString() ?? "";
+                        var genre = item["genre"]?.ToString() ?? category["name"]?.ToString() ?? "Movies";
+                        
+                        int year = DateTime.Now.Year;
+                        var releaseDate = item["clip"]?["originalReleaseDate"]?.ToString();
+                        if (!string.IsNullOrEmpty(releaseDate) && releaseDate.Length >= 4)
+                        {
+                            int.TryParse(releaseDate.Substring(0, 4), out year);
+                        }
+
+                        string poster = item["featuredImage"]?["path"]?.ToString() ?? "";
+                        var covers = item["covers"]?.AsArray();
+                        if (covers != null)
+                        {
+                            var vertical = covers.FirstOrDefault(c => c?["aspectRatio"]?.ToString() == "347:500");
+                            if (vertical != null) poster = vertical["url"]?.ToString() ?? poster;
+                        }
+
+                        vodItems.Add(new {
+                            id = id,
+                            title = name,
+                            summary = desc,
+                            genre = genre,
+                            release_year = year,
+                            image_url = poster,
+                            // This points directly back to our new VOD proxy route below!
+                            video_url = $"http://{host}/{provider}/{countryCode}/watch/vod/{id}"
+                        });
+                    }
+                }
+
+                return Results.Json(vodItems);
+            });
+
+            // 6. VOD Watch Route (Stitcher Handshake)
+            _host.MapGet("/{provider}/{countryCode}/watch/vod/{id}", async (string provider, string countryCode, string id, HttpContext context, PlutoClient plutoClient) =>
+            {
+                int streamIndex = id.GetHashCode() & int.MaxValue;
+                
+                var bootData = await plutoClient.GetBootDataAsync(countryCode, streamIndex, streamIndex);
+                if (bootData == null) return Results.StatusCode(500);
+
+                var token = bootData["sessionToken"]?.ToString() ?? "";
+                var stitcherParams = bootData["stitcherParams"]?.ToString() ?? "";
+                
+                var stitcher = "https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv";
+                
+                // CRITICAL DIFFERENCE: VOD uses /episode/ instead of /channel/
+                var basePath = $"/stitch/hls/episode/{id}/master.m3u8";
+
+                var query = HttpUtility.ParseQueryString(stitcherParams);
+                query["deviceId"] = plutoClient.GetDeviceId(streamIndex);
+
+                if (!string.IsNullOrEmpty(token)) query["jwt"] = token;
+                query["masterJWTPassthrough"] = "true";
+
+                string videoUrl = $"{stitcher}/v2{basePath}?{query.ToString()}";
+
+                int activeAccounts = Math.Max(1, plutoClient.GetValidAccounts().Count);
+                App.LogToConsole($"[VOD WATCH] Tuning {id} on account #{streamIndex % activeAccounts + 1} ...");
+                
+                return Results.Redirect(videoUrl, permanent: false);
             });
 
             await _host.StartAsync();

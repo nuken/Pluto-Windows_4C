@@ -273,6 +273,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
                     {
                         VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} M3U", Url = $"http://{host}/pluto/{region.Name}/playlist.m3u" });
                         VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} EPG", Url = $"http://{host}/pluto/epg/{region.Name}/epg-{region.Name}.xml" });
+                        VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} VOD", Url = $"http://{host}/pluto/{region.Name}/vod.json" });
                     }
                 }
             });
@@ -332,7 +333,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
 		private async void CheckVersion_Click(object sender, RoutedEventArgs e)
         {
             // The current version of this build
-            string currentVersion = "v1.2.3"; 
+            string currentVersion = "v1.2.4"; 
             
             // The raw URL to your GitHub text file
             string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/main/version.txt";

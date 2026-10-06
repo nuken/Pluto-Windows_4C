@@ -215,6 +215,32 @@ namespace PlutoForChannels
 
             return null;
         }
+		
+		public async Task<JsonNode?> GetVodCatalogAsync(string countryCode)
+        {
+            var requestUri = "https://api.pluto.tv/v3/vod/categories?includeItems=true&deviceType=web";
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+
+            if (_xForward.TryGetValue(countryCode, out var ip) && !string.IsNullOrEmpty(ip))
+            {
+                request.Headers.Add("X-Forwarded-For", ip);
+            }
+
+            try
+            {
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<JsonNode>();
+                }
+            }
+            catch (Exception ex)
+            {
+                App.LogToConsole($"[ERROR] Fetching VOD Catalog: {ex.Message}");
+            }
+
+            return null;
+        }
 
         public async Task<List<Channel>> GetChannelsAsync(string countryCode)
         {
