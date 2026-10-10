@@ -111,7 +111,7 @@ namespace PlutoForChannels
         query["deviceType"] = "web";
         query["clientID"] = _devicePool[deviceIndex]; 
         query["clientModelNumber"] = "1.0.0";
-        query["serverSideAds"] = "false";
+        query["serverSideAds"] = "true";
         query["drmCapabilities"] = "widevine:L3";
         query["blockingMode"] = "";
         query["notificationVersion"] = "1";

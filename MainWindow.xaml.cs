@@ -205,6 +205,16 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
                 catch { /* Fallback to default if corrupted */ }
             }
 
+            // ADD THIS TO LOAD THE CHECKBOX STATE
+            if (settings != null)
+            {
+                VodFeatureToggle.IsChecked = settings.EnableVod;
+            }
+            else
+            {
+                VodFeatureToggle.IsChecked = true; // Default state
+            }
+
             foreach (var code in codes)
             {
                 bool isSelected = settings?.SelectedRegions?.Contains(code) ?? (code == "all" || code == "local");
@@ -213,47 +223,54 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
         }
 
         private void SaveSettings()
+{
+    try
+    {
+        var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+        
+        int savedPort = 7777;
+        bool savedStartHidden = false;
+
+        if (System.IO.File.Exists(settingsPath))
         {
-            try
-            {
-                var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
-                
-                // Read the existing port so we don't accidentally overwrite it
-                int savedPort = 7777;
-                if (System.IO.File.Exists(settingsPath))
+            try {
+                var existing = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
+                if (existing != null)
                 {
-                    try {
-                        var existing = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
-                        if (existing != null && existing.Port > 0) savedPort = existing.Port;
-                    } catch { }
+                    if (existing.Port > 0) savedPort = existing.Port;
+                    savedStartHidden = existing.StartHidden;
                 }
-
-                var settings = new AppSettings
-                {
-                    Port = savedPort, // <--- PRESERVE THE PORT
-                    Username = UsernameBox.Text.Trim(),
-                    Password = PasswordBox.Password,
-                    Username2 = UsernameBox2.Text.Trim(),
-                    Password2 = PasswordBox2.Password,
-                    Username3 = UsernameBox3.Text.Trim(),
-                    Password3 = PasswordBox3.Password,
-                    Username4 = UsernameBox4.Text.Trim(),
-                    Password4 = PasswordBox4.Password
-                };
-
-                foreach (var r in Regions)
-                {
-                    if (r.IsSelected) settings.SelectedRegions.Add(r.Name);
-                }
-
-                var json = System.Text.Json.JsonSerializer.Serialize(settings);
-                System.IO.File.WriteAllText(settingsPath, json);
-            }
-            catch (Exception ex)
-            {
-                App.LogToConsole($"[WARNING] Could not save settings.json: {ex.Message}");
-            }
+            } catch { }
         }
+
+        var settings = new AppSettings
+        {
+            Port = savedPort,
+            StartHidden = savedStartHidden,
+            EnableVod = VodFeatureToggle.IsChecked == true, // <-- Persist VOD state
+            Username = UsernameBox.Text.Trim(),
+            Password = PasswordBox.Password,
+            Username2 = UsernameBox2.Text.Trim(),
+            Password2 = PasswordBox2.Password,
+            Username3 = UsernameBox3.Text.Trim(),
+            Password3 = PasswordBox3.Password,
+            Username4 = UsernameBox4.Text.Trim(),
+            Password4 = PasswordBox4.Password
+        };
+
+        foreach (var r in Regions)
+        {
+            if (r.IsSelected) settings.SelectedRegions.Add(r.Name);
+        }
+
+        var json = System.Text.Json.JsonSerializer.Serialize(settings);
+        System.IO.File.WriteAllText(settingsPath, json);
+    }
+    catch (Exception ex)
+    {
+        App.LogToConsole($"[WARNING] Could not save settings.json: {ex.Message}");
+    }
+}
 
         private void SaveLogin_Click(object sender, RoutedEventArgs e)
         {
@@ -262,22 +279,50 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
             App.LogToConsole("[INFO] Credentials saved. Session cache cleared.");
             System.Windows.MessageBox.Show("Credentials saved successfully!", "Saved", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
+		
+		private void VodFeatureToggle_Changed(object sender, RoutedEventArgs e)
+{
+    if (!this.IsLoaded) return; 
+
+    // Update the AppSettings instance and save it
+    var settingsPath = System.IO.Path.Combine(AppContext.BaseDirectory, "settings.json");
+    if (System.IO.File.Exists(settingsPath))
+    {
+        try
+        {
+            var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(System.IO.File.ReadAllText(settingsPath));
+            if (settings != null)
+            {
+                settings.EnableVod = VodFeatureToggle.IsChecked == true;
+                System.IO.File.WriteAllText(settingsPath, System.Text.Json.JsonSerializer.Serialize(settings));
+                
+                // Prompt user to restart the background server
+                System.Windows.MessageBox.Show("Please restart the proxy server for this change to take effect.", "Restart Required", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            }
+        }
+        catch { }
+    }
+}
 
         public void RefreshLinks(string host)
+{
+    Dispatcher.Invoke(() => {
+        VisibleLinks.Clear();
+        foreach (var region in Regions)
         {
-            Dispatcher.Invoke(() => {
-                VisibleLinks.Clear();
-                foreach (var region in Regions)
+            if (region.IsSelected)
+            {
+                VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} M3U", Url = $"http://{host}/pluto/{region.Name}/playlist.m3u" });
+                VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} EPG", Url = $"http://{host}/pluto/epg/{region.Name}/epg-{region.Name}.xml" });
+
+                if (VodFeatureToggle.IsChecked == true)
                 {
-                    if (region.IsSelected)
-                    {
-                        VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} M3U", Url = $"http://{host}/pluto/{region.Name}/playlist.m3u" });
-                        VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} EPG", Url = $"http://{host}/pluto/epg/{region.Name}/epg-{region.Name}.xml" });
-                        VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} VOD", Url = $"http://{host}/pluto/{region.Name}/vod.json" });
-                    }
+                    VisibleLinks.Add(new FeedLink { Title = $"{region.Name.ToUpper()} VOD", Url = $"http://{host}/pluto/{region.Name}/vod.json" });
                 }
-            });
+            }
         }
+    });
+}
 
         private void Country_Changed(object sender, RoutedEventArgs e)
         {
@@ -333,7 +378,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
 		private async void CheckVersion_Click(object sender, RoutedEventArgs e)
         {
             // The current version of this build
-            string currentVersion = "v1.2.4"; 
+            string currentVersion = "v1.2.5"; 
             
             // The raw URL to your GitHub text file
             string versionUrl = "https://raw.githubusercontent.com/nuken/Pluto-Windows_4C/refs/heads/main/version.txt";
@@ -397,7 +442,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
             if (ExtraAccountsPanel != null) ExtraAccountsPanel.Visibility = Visibility.Collapsed;
         }
 
-    } // <--- THIS is the closing brace for the MainWindow class
+    } 
 
     public class RegionOption { public string Name { get; set; } = ""; public bool IsSelected { get; set; } }
     public class FeedLink { public string Title { get; set; } = ""; public string Url { get; set; } = ""; }
@@ -406,6 +451,7 @@ startHiddenMenuItem.CheckedChanged += (s, e) =>
     {
         public int Port { get; set; } = 7777;
 		public bool StartHidden { get; set; } = false;
+		public bool EnableVod { get; set; } = true;
         public System.Collections.Generic.List<string> SelectedRegions { get; set; } = new();
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
